@@ -1,0 +1,49 @@
+# This workflow will do a clean install of node dependencies, build the source code and run tests across different versions of node
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-nodejs-with-github-actions
+
+name: ci-build-pr
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+      - 'build-rt.sh'
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [14.x]
+        wabt-version: [1.0.20]
+
+    steps:
+    - name: Checkout source code
+      uses: actions/checkout@v2
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v1
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: Use WABT ${{ matrix.wabt-version }}
+      uses: mwilliamson/setup-wabt-action@v1
+      with:
+        wabt-version: ${{ matrix.wabt-version }}
+
+    - name: Build Runtime WASM Modules
+      run: |
+        chmod +x ./build-rt.sh
+        bash ./build-rt.sh
+
+    - name: NPM build/test
+      run: |
+        npm ci
+        npm run build --if-present
+        npm test

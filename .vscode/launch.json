@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Tests",
+            "type": "node",
+            "request": "launch",
+            "program": "${workspaceFolder}/node_modules/mocha/bin/mocha",
+            "args": [
+                "--require", "source-map-support/register",
+                "--require", "esm",
+                "--timeout", "120000000",
+                // "--fgrep", ">>>",
+                "${workspaceFolder}/out/test/**/*.test.js",
+            ],
+            "console": "integratedTerminal",
+            "preLaunchTask": "tsc: build"
+        }
+    ]
+}

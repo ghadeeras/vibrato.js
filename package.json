@@ -1,0 +1,42 @@
+{
+  "name": "vibrato.js",
+  "version": "1.0.0",
+  "description": "Digital signal processing framework for the JavaScript programing language.",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "test": "nyc --reporter=html -- mocha --require esm --require source-map-support/register --recursive \"./out/test/**/*.test.js\"",
+    "pretest": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ghadeeras/vibrato.js.git"
+  },
+  "keywords": [
+    "dsp",
+    "digital-signal-processing",
+    "audio-processing",
+    "music-synthesis",
+    "fast-fourier-transform",
+    "signal-analysis"
+  ],
+  "author": "Ghadeer Abou-Saleh",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/ghadeeras/vibrato.js/issues"
+  },
+  "homepage": "https://github.com/ghadeeras/vibrato.js#readme",
+  "devDependencies": {
+    "@types/chai": "^4.2.14",
+    "@types/mocha": "^8.2.0",
+    "chai": "^4.3.0",
+    "esm": "^3.2.25",
+    "mocha": "^8.2.1",
+    "nyc": "^15.1.0",
+    "source-map-support": "^0.5.19"
+  },
+  "dependencies": {
+    "@types/node": "^14.14.25",
+    "binaryen": "^98.0.0"
+  }
+}
