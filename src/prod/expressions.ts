@@ -19,19 +19,19 @@ export type BinaryenInstructionType = binaryen.Module["i32"] | binaryen.Module["
 export interface Expression {
 }
 
-export abstract class Value<A extends types.NumberArray, S extends number> implements Expression {
+export abstract class Value<A extends types.NumberArray> implements Expression {
 
     private calculated = false
     private cachedValue: number[] | null = null
 
-    constructor(readonly type: types.Vector<A, S>) {
+    constructor(readonly type: types.Vector<A>) {
     }
 
-    named(name: string | null = null): Value<A, S> {
+    named(name: string | null = null): Value<A> {
         return new NamedValue(this, name)
     }
     
-    delay<L extends number>(length: L): Delay<A, S, L> {
+    delay<L extends number>(length: L): Delay<A> {
         throw new Error('Method not implemented.');
     }
 
@@ -62,7 +62,7 @@ export abstract class Value<A extends types.NumberArray, S extends number> imple
     vectorReference(module: binaryen.Module, resultRef: binaryen.ExpressionRef, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.ExpressionRef {
         return this.block(module, [ 
             ...this.components(i => 
-                instructionType.store(i * this.type.primitiveType.sizeInBytes, 0,
+                instructionType.store(i * this.type.componentType.sizeInBytes, 0,
                     resultRef,
                     this.primitiveReference(i, module, dataType, instructionType)
                 )
@@ -77,18 +77,22 @@ export abstract class Value<A extends types.NumberArray, S extends number> imple
 
     abstract primitiveReference(component: number, module: binaryen.Module, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.ExpressionRef
 
-    abstract vectorDeclarations(module: binaryen.Module, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.FunctionRef[]
+    vectorDeclarations(module: binaryen.Module, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.FunctionRef[] {
+        return []
+    }
 
-    abstract primitiveDeclarations(module: binaryen.Module, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.FunctionRef[]
+    primitiveDeclarations(module: binaryen.Module, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.FunctionRef[] {
+        return []
+    }
 
     private typeInfo(module: binaryen.Module): [binaryen.Type, BinaryenInstructionType] {
-        return this.type.primitiveType == types.integer ?
+        return this.type.componentType == types.integer ?
             [binaryen.i32, module.i32] :
             [binaryen.f64, module.f64]
     }
 
     protected allocateReference(module: binaryen.Module): binaryen.ExpressionRef {
-        const functionName: keyof rt.MemExports = this.type.primitiveType == types.integer ? "allocate32" : "allocate64"
+        const functionName: keyof rt.MemExports = this.type.componentType == types.integer ? "allocate32" : "allocate64"
         return module.call(functionName, [module.i32.const(this.type.size)], binaryen.i32)
     }
 
@@ -105,12 +109,12 @@ export abstract class Value<A extends types.NumberArray, S extends number> imple
     
 }
 
-export class NamedValue<A extends types.NumberArray, S extends number> extends Value<A, S> {
+export class NamedValue<A extends types.NumberArray, S extends number> extends Value<A> {
     
     private readonly name: string 
     private readonly isPublic: boolean 
 
-    constructor(private wrapped: Value<A, S>, name: string | null) {
+    constructor(private wrapped: Value<A>, name: string | null) {
         super(wrapped.type)
         this.name = name ? name : newValueName()
         this.isPublic = name != null
@@ -129,7 +133,7 @@ export class NamedValue<A extends types.NumberArray, S extends number> extends V
     }
 
     vectorReference(module: binaryen.Module, resultRef: binaryen.ExpressionRef, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.ExpressionRef {
-        return module.call(`${this.name}_v`, [resultRef], resultRef)
+        return module.call(this.vectorName(), [resultRef], resultRef)
     }
 
     primitiveReference(component: number, module: binaryen.Module, dataType: number, instructionType: BinaryenInstructionType): number {
@@ -146,7 +150,7 @@ export class NamedValue<A extends types.NumberArray, S extends number> extends V
 
     primitiveDeclarations(module: binaryen.Module, dataType: number, instructionType: BinaryenInstructionType): number[] {
         return [...this.components(i => 
-            module.addFunction(`${this.name}_${i}`, binaryen.createType([]), dataType, [], 
+            module.addFunction(this.primitiveName(i), binaryen.createType([]), dataType, [], 
                 this.wrapped.primitiveReference(i, module, dataType, instructionType)
             )
         )]
@@ -168,12 +172,12 @@ export interface Function<I extends Expression, O extends Expression> extends Ex
 
 }
 
-export interface Delay<A extends types.NumberArray, S extends number, L extends number> extends Expression {
+export interface Delay<A extends types.NumberArray> extends Expression {
 
-    length: L
+    length: number
 
-    value: Value<A, S>
+    value: Value<A>
 
-    at(index: Value<Int32Array, 1>): Value<A, S>
+    at(index: Value<Int32Array>): Value<A>
 
 }

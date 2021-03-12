@@ -12,9 +12,9 @@ export type PrimitiveName<A extends NumberArray> =
 
 export interface RawView {
 
-    get(offset: number): number
+    get(byteOffset: number): number
 
-    set(offset: number, value: number): RawView
+    set(byteOffset: number, value: number): RawView
 
 }
 
@@ -24,23 +24,23 @@ export interface Primitive<A extends NumberArray> {
     
     readonly sizeInBytes: PrimitiveSize<A>
 
-    view(buffer: ArrayBuffer, offset?: number, length?: number): A
+    view(buffer: ArrayBuffer, byteOffset?: number, length?: number): A
 
-    rawView(buffer: ArrayBuffer, offset?: number): RawView
+    rawView(buffer: ArrayBuffer, byteOffset?: number): RawView
 
 }
 
-export interface Vector<A extends NumberArray, S extends number> {
+export interface Vector<A extends NumberArray> {
 
-    readonly primitiveType: Primitive<A>
+    readonly componentType: Primitive<A>
     
-    readonly size: S
+    readonly size: number
 
     readonly sizeInBytes: number
 
-    view(buffer: ArrayBuffer, offset?: number, length?: number): A[]
+    view(buffer: ArrayBuffer, byteOffset?: number, length?: number): A[]
 
-    flatView(buffer: ArrayBuffer, offset?: number, length?: number): A
+    flatView(buffer: ArrayBuffer, byteOffset?: number, length?: number): A
 
 }
 
@@ -51,18 +51,18 @@ class GenericRawView implements RawView {
     constructor(
         buffer: ArrayBuffer, 
         offset: number, 
-        private getter: (dv: DataView, o: number) => number, 
-        private setter: (dv: DataView, o: number, v: number) => void
+        private getter: (dv: DataView, bo: number) => number, 
+        private setter: (dv: DataView, bo: number, v: number) => void
     ) {
         this.view = new DataView(buffer, offset)
     }
 
-    get(offset: number): number {
-        return this.getter(this.view, offset)
+    get(byteOffset: number): number {
+        return this.getter(this.view, byteOffset)
     }
 
-    set(offset: number, value: number): RawView {
-        this.setter(this.view, offset, value)
+    set(byteOffset: number, value: number): RawView {
+        this.setter(this.view, byteOffset, value)
         return this
     }
 
@@ -77,14 +77,14 @@ export class Integer implements Primitive<Int32Array> {
     private constructor() {
     }
     
-    view(buffer: ArrayBuffer, offset: number = 0, length: number = 1): Int32Array {
-        return new Int32Array(buffer, offset, length)
+    view(buffer: ArrayBuffer, byteOffset: number = 0, length: number = 1): Int32Array {
+        return new Int32Array(buffer, byteOffset, length)
     }
 
-    rawView(buffer: ArrayBuffer, offset: number = 0): RawView {
-        return new GenericRawView(buffer, offset, 
-            (dv, o) => dv.getInt32(o), 
-            (dv, o, v) => dv.setInt32(o, v)
+    rawView(buffer: ArrayBuffer, byteOffset: number = 0): RawView {
+        return new GenericRawView(buffer, byteOffset, 
+            (dv, bo) => dv.getInt32(bo), 
+            (dv, bo, v) => dv.setInt32(bo, v)
         )
     }
 
@@ -101,14 +101,14 @@ export class Real implements Primitive<Float64Array> {
     private constructor() {
     }
     
-    view(buffer: ArrayBuffer, offset: number = 0, length: number = 1): Float64Array {
-        return new Float64Array(buffer, offset, length)
+    view(buffer: ArrayBuffer, byteOffset: number = 0, length: number = 1): Float64Array {
+        return new Float64Array(buffer, byteOffset, length)
     }
 
-    rawView(buffer: ArrayBuffer, offset: number = 0): RawView {
-        return new GenericRawView(buffer, offset, 
-            (dv, o) => dv.getFloat64(o), 
-            (dv, o, v) => dv.setFloat64(o, v)
+    rawView(buffer: ArrayBuffer, byteOffset: number = 0): RawView {
+        return new GenericRawView(buffer, byteOffset, 
+            (dv, bo) => dv.getFloat64(bo), 
+            (dv, bo, v) => dv.setFloat64(bo, v)
         )
     }
 
@@ -119,33 +119,33 @@ export class Real implements Primitive<Float64Array> {
 export const integer = Integer.type
 export const real = Real.type
 
-class GenericVector<A extends NumberArray, S extends number> implements Vector<A, S> {
+class GenericVector<A extends NumberArray> implements Vector<A> {
     
     readonly sizeInBytes: number
 
-    constructor(readonly primitiveType: Primitive<A>, readonly size: S) {
-        this.sizeInBytes = primitiveType.sizeInBytes * size
+    constructor(readonly componentType: Primitive<A>, readonly size: number) {
+        this.sizeInBytes = componentType.sizeInBytes * size
     }
 
-    view(buffer: ArrayBuffer, offset: number = 0, length: number = 1): A[] {
+    view(buffer: ArrayBuffer, byteOffset: number = 0, length: number = 1): A[] {
         const result: A[] = []
-        for (let o = offset; length-- > 0; o += this.primitiveType.sizeInBytes) {
-            result.push(this.primitiveType.view(buffer, o, this.size))
+        for (let o = byteOffset; length-- > 0; o += this.componentType.sizeInBytes) {
+            result.push(this.componentType.view(buffer, o, this.size))
         }
         return result
     }
 
-    flatView(buffer: ArrayBuffer, offset: number = 0, length: number = 1): A {
-        return this.primitiveType.view(buffer, offset, length * this.size)
+    flatView(buffer: ArrayBuffer, byteOffset: number = 0, length: number = 1): A {
+        return this.componentType.view(buffer, byteOffset, length * this.size)
     }
 
 }
 
-export function vectorOf<A extends NumberArray, S extends number>(size: S, primitiveType: Primitive<A>): Vector<A, S> {
+export function vectorOf<A extends NumberArray>(size: number, primitiveType: Primitive<A>): Vector<A> {
     return new GenericVector(primitiveType, size)
 }
 
-export class Discrete extends GenericVector<Int32Array, 1> {
+export class Discrete extends GenericVector<Int32Array> {
 
     private constructor() {
         super(integer, 1)
@@ -155,7 +155,7 @@ export class Discrete extends GenericVector<Int32Array, 1> {
 
 }
 
-export class Scalar extends GenericVector<Float64Array, 1> {
+export class Scalar extends GenericVector<Float64Array> {
 
     private constructor() {
         super(real, 1)
@@ -165,7 +165,7 @@ export class Scalar extends GenericVector<Float64Array, 1> {
 
 }
 
-export class Complex extends GenericVector<Float64Array, 2> {
+export class Complex extends GenericVector<Float64Array> {
 
     private constructor() {
         super(real, 2)

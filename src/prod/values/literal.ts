@@ -3,11 +3,11 @@ import * as exps from '../expressions'
 
 import binaryen from 'binaryen'
 
-export class Literal<A extends types.NumberArray, S extends number> extends exps.Value<A, S> {
+export class Literal<A extends types.NumberArray> extends exps.Value<A> {
 
     private value: number[]
 
-    private constructor(type: types.Vector<A, S>, value: number[]) {
+    private constructor(type: types.Vector<A>, value: number[]) {
         super(type)
         assert(() => `Expected ${type.size} vector components; found ${value.length}`, type.size == value.length)
         this.value = [...value]
@@ -23,14 +23,6 @@ export class Literal<A extends types.NumberArray, S extends number> extends exps
 
     primitiveReference(component: number, module: binaryen.Module, dataType: binaryen.Type, instructionType: exps.BinaryenInstructionType): binaryen.ExpressionRef {
         return instructionType.const(this.value[component])
-    }
-
-    vectorDeclarations(module: binaryen.Module, dataType: binaryen.Type, instructionType: exps.BinaryenInstructionType): binaryen.FunctionRef[] {
-        return []
-    }
-
-    primitiveDeclarations(module: binaryen.Module, dataType: binaryen.Type, instructionType: exps.BinaryenInstructionType): binaryen.FunctionRef[] {
-        return []
     }
 
     static discrete(value: number) {

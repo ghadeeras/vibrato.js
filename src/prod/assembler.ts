@@ -10,7 +10,7 @@ export class Assembler {
     readonly binaryCode: Uint8Array
     readonly textCode: string;
     
-    constructor(values: exps.Value<types.NumberArray, number>[]) {
+    constructor(values: exps.Value<types.NumberArray>[]) {
         const module = new binaryen.Module();
 
         rt.addImportsToModule(module)
