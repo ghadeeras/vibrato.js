@@ -43,62 +43,81 @@ export abstract class Value<A extends types.NumberArray> implements Expression {
         return this.cachedValue ? [...this.cachedValue] : this.cachedValue
     }
 
-    reference(module: binaryen.Module, resultRef: binaryen.ExpressionRef | null = null): binaryen.ExpressionRef {
-        const [dataType, insType] = this.typeInfo(module)
-        return resultRef ?
-                this.vectorReference(module, resultRef, dataType, insType) :
-            this.type.size > 1 ? 
-                this.vectorReference(module, this.allocateReference(module), dataType, insType) :
-                this.primitiveReference(0, module, dataType, insType)
-    }
-
-    declarations(module: binaryen.Module): binaryen.FunctionRef[] {
-        const [dataType, insType] = this.typeInfo(module)
-        return this.type.size > 1 ?
-            this.vectorDeclarations(module, dataType, insType) :
-            this.primitiveDeclarations(module, dataType, insType)
-    }
-
-    vectorReference(module: binaryen.Module, resultRef: binaryen.ExpressionRef, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.ExpressionRef {
-        return this.block(module, [ 
-            ...this.components(i => 
-                instructionType.store(i * this.type.componentType.sizeInBytes, 0,
-                    resultRef,
-                    this.primitiveReference(i, module, dataType, instructionType)
-                )
-            ),
-            resultRef
-        ])
-    }
-
     abstract calculate(): number[] | null
 
     abstract exports(): Record<string, string>
 
-    abstract primitiveReference(component: number, module: binaryen.Module, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.ExpressionRef
+    expression(module: binaryen.Module, variablesIndex: number = 0): binaryen.ExpressionRef {
+        const [dataType, insType] = this.typeInfo(module)
+        return this.type.size > 1 ? 
+            this.vectorExpression(module, variablesIndex, dataType, insType) :
+            this.primitiveExpression(0, module, variablesIndex, dataType, insType)
+    }
 
-    vectorDeclarations(module: binaryen.Module, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.FunctionRef[] {
+    vectorExpression(module: binaryen.Module, variablesIndex: number, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.ExpressionRef {
+        return this.block(module, [
+            module.local.set(variablesIndex, this.allocateResultSpace(module)),
+            ...this.vectorSubExpressions(module, variablesIndex, dataType, instructionType),
+            module.local.get(variablesIndex, binaryen.i32)
+        ])
+    }
+
+    vectorSubExpressions(module: binaryen.Module, variablesIndex: number, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.ExpressionRef[] {
+        return [...this.components(i => 
+            instructionType.store(i * this.type.componentType.sizeInBytes, 0,
+                module.local.get(variablesIndex, binaryen.i32),
+                this.primitiveExpression(i, module, variablesIndex, dataType, instructionType)
+            )
+        )]
+    }
+
+    abstract primitiveExpression(component: number, module: binaryen.Module, variablesIndex: number, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.ExpressionRef
+
+    variables(): binaryen.Type[] {
+        return this.type.size > 1 ?
+            this.vectorExpressionVariables() :
+            this.primitiveExpressionVariables()
+    }
+
+    vectorExpressionVariables(): binaryen.Type[] {
+        return [binaryen.i32]
+    }
+
+    primitiveExpressionVariables(): binaryen.Type[] {
         return []
     }
 
-    primitiveDeclarations(module: binaryen.Module, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.FunctionRef[] {
+    functions(module: binaryen.Module): binaryen.FunctionRef[] {
+        const [dataType, insType] = this.typeInfo(module)
+        return this.type.size > 1 ?
+            this.vectorFunctions(module, dataType, insType) :
+            this.primitiveFunctions(module, dataType, insType)
+    }
+
+    vectorFunctions(module: binaryen.Module, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.FunctionRef[] {
         return []
     }
 
-    private typeInfo(module: binaryen.Module): [binaryen.Type, BinaryenInstructionType] {
+    primitiveFunctions(module: binaryen.Module, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.FunctionRef[] {
+        return []
+    }
+
+    protected typeInfo(module: binaryen.Module): [binaryen.Type, BinaryenInstructionType] {
         return this.type.componentType == types.integer ?
             [binaryen.i32, module.i32] :
             [binaryen.f64, module.f64]
     }
 
-    protected allocateReference(module: binaryen.Module): binaryen.ExpressionRef {
+    protected allocateResultSpace(module: binaryen.Module): binaryen.ExpressionRef {
         const functionName: keyof rt.MemExports = this.type.componentType == types.integer ? "allocate32" : "allocate64"
         return module.call(functionName, [module.i32.const(this.type.size)], binaryen.i32)
     }
 
     protected block(module: binaryen.Module, expressions: binaryen.ExpressionRef[]) {
         const label = newBlockName()
-        return expressions.length > 1 ? module.block(label, expressions, binaryen.i32) : expressions[0]
+        return expressions.length > 1 ? 
+            module.block(label, expressions, binaryen.getExpressionType(expressions[expressions.length - 1])) : 
+            expressions[0]
     }
     
     protected *components<T>(mapper: (component: number) => T) {
@@ -125,33 +144,37 @@ export class NamedValue<A extends types.NumberArray, S extends number> extends V
     }
 
     exports(): Record<string, string> {
-        return { 
+        return this.isPublic ? { 
             [this.name] : this.type.size > 1 ? 
                 this.vectorName() : 
                 this.primitiveName(0) 
-        }
+        } : {}
     }
 
-    vectorReference(module: binaryen.Module, resultRef: binaryen.ExpressionRef, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.ExpressionRef {
-        return module.call(this.vectorName(), [resultRef], resultRef)
+    vectorExpressionVariables(): binaryen.Type[] {
+        return []
     }
 
-    primitiveReference(component: number, module: binaryen.Module, dataType: number, instructionType: BinaryenInstructionType): number {
+    vectorExpression(module: binaryen.Module, variablesIndex: binaryen.ExpressionRef, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.ExpressionRef {
+        return module.call(this.vectorName(), [], binaryen.i32)
+    }
+
+    primitiveExpression(component: number, module: binaryen.Module, variablesIndex: number, dataType: number, instructionType: BinaryenInstructionType): number {
         return module.call(this.primitiveName(component), [], dataType)
     }
 
-    vectorDeclarations(module: binaryen.Module, dataType: number, instructionType: BinaryenInstructionType): number[] {
+    vectorFunctions(module: binaryen.Module, dataType: number, instructionType: BinaryenInstructionType): number[] {
         return [
-            module.addFunction(this.vectorName(), binaryen.createType([binaryen.i32]), binaryen.i32, [], 
-                this.wrapped.vectorReference(module, module.local.get(0, binaryen.i32), dataType, instructionType)
+            module.addFunction(this.vectorName(), binaryen.createType([]), binaryen.i32, this.wrapped.vectorExpressionVariables(), 
+                this.wrapped.vectorExpression(module, 0, dataType, instructionType)
             )
         ]
     }
 
-    primitiveDeclarations(module: binaryen.Module, dataType: number, instructionType: BinaryenInstructionType): number[] {
+    primitiveFunctions(module: binaryen.Module, dataType: number, instructionType: BinaryenInstructionType): number[] {
         return [...this.components(i => 
             module.addFunction(this.primitiveName(i), binaryen.createType([]), dataType, [], 
-                this.wrapped.primitiveReference(i, module, dataType, instructionType)
+                this.wrapped.primitiveExpression(i, module, 0, dataType, instructionType)
             )
         )]
     }

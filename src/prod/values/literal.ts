@@ -21,7 +21,7 @@ export class Literal<A extends types.NumberArray> extends exps.Value<A> {
         return {}
     }
 
-    primitiveReference(component: number, module: binaryen.Module, dataType: binaryen.Type, instructionType: exps.BinaryenInstructionType): binaryen.ExpressionRef {
+    primitiveExpression(component: number, module: binaryen.Module, variablesIndex: number, dataType: binaryen.Type, instructionType: exps.BinaryenInstructionType): binaryen.ExpressionRef {
         return instructionType.const(this.value[component])
     }
 

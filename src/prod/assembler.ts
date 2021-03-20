@@ -16,7 +16,7 @@ export class Assembler {
         rt.addImportsToModule(module)
         
         for (let value of values) {
-            value.declarations(module)
+            value.functions(module)
             const exports = value.exports();
             for (let k in exports) {
                 module.addFunctionExport(exports[k], k)
