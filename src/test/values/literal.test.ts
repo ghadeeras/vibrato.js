@@ -1,17 +1,17 @@
 import { expect } from 'chai'
 import { Literal } from '../../prod/values/literal'
-import * as asm from '../../prod/assembler'
-import * as rt from '../../prod/rt'
+import { Assembler } from '../../prod/assembler'
+import { initWaModulesFS } from '../../prod/rt'
 import * as types from '../../prod/datatypes'
 
 type TestExports = {
     pi: () => number,
     five: () => number,
-    complex: (ref: number) => number,
-    vector: (ref: number) => number,
+    complex: () => number,
+    vector: () => number,
 }
 
-const assembler = new asm.Assembler([
+const assembler = new Assembler([
     Literal.scalar(3.14).named("pi"),
     Literal.discrete(5).named("five"),
     Literal.complex(0.7, 0.5).named("complex"),
@@ -20,7 +20,7 @@ const assembler = new asm.Assembler([
 
 console.log(assembler.textCode)
 
-const rtModules = rt.initWaModulesFS("./out/rt")
+const rtModules = initWaModulesFS("./out/rt")
 const mem = notNull(rtModules.mem.exports, "Couldn't load Vibrato runtime!")
 const test = assembler.exports<TestExports>(rtModules)
 
@@ -35,7 +35,7 @@ describe("Literal", () => {
     })
 
     it("returns literal complex values", () => {
-        const ref = test.complex(mem.allocate64(2))
+        const ref = test.complex()
         const view = types.complex.view(mem.stack.buffer, ref)[0]
         expect(view.length).to.equal(2)
         expect(view[0]).to.equal(0.7)
@@ -43,7 +43,7 @@ describe("Literal", () => {
     })
 
     it("returns literal vector values", () => {
-        const ref = test.vector(mem.allocate64(3))
+        const ref = test.vector()
         const view = types.vectorOf(3, types.real).view(mem.stack.buffer, ref)[0]
         expect(view.length).to.equal(3)
         expect(view[0]).to.equal(1.2)

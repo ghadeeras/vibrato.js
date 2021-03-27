@@ -45,7 +45,9 @@ export abstract class Value<A extends types.NumberArray> implements Expression {
 
     abstract calculate(): number[] | null
 
-    abstract exports(): Record<string, string>
+    exports(): Record<string, string> {
+        return {}
+    }
 
     expression(module: binaryen.Module, variablesIndex: number = 0): binaryen.ExpressionRef {
         const [dataType, insType] = this.typeInfo(module)
@@ -89,9 +91,10 @@ export abstract class Value<A extends types.NumberArray> implements Expression {
 
     functions(module: binaryen.Module): binaryen.FunctionRef[] {
         const [dataType, insType] = this.typeInfo(module)
-        return this.type.size > 1 ?
-            this.vectorFunctions(module, dataType, insType) :
-            this.primitiveFunctions(module, dataType, insType)
+        return [
+            ...this.vectorFunctions(module, dataType, insType),
+            ...this.primitiveFunctions(module, dataType, insType)
+        ]
     }
 
     vectorFunctions(module: binaryen.Module, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.FunctionRef[] {
