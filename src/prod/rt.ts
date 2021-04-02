@@ -216,17 +216,19 @@ export function addSpaceImportsToModule(module: binaryen.Module) {
     module.addFunctionImport("f64_vec_normalize_r", "space", "f64_vec_normalize_r", size_vec_result, binaryen.i32)
 }
 
-const modules = {
-    mem: wa.module<MemExports>("mem.wasm"),
-    space: wa.module<SpaceExports>("space.wasm")
-}
+function modules(){
+    return {
+        mem: wa.module<MemExports>("mem.wasm"),
+        space: wa.module<SpaceExports>("space.wasm")
+    }
+} 
 
-export type RuntimeModules = typeof modules
+export type RuntimeModules = ReturnType<typeof modules>
 
 export async function initWaModulesWeb(waPath: string) {
-    return wa.loadWeb(waPath, modules, "mem", "space");
+    return wa.loadWeb(waPath, modules(), "mem", "space");
 }
 
 export function initWaModulesFS(waPath: string) {
-    return wa.loadFS(waPath, modules, "mem", "space");
+    return wa.loadFS(waPath, modules(), "mem", "space");
 }

@@ -17,6 +17,15 @@ export function newValueName(): string {
 export type BinaryenInstructionType = binaryen.Module["i32"] | binaryen.Module["f64"]
 
 export interface Expression {
+
+    memory(memoryAllocator: StaticMemoryAllocator): void
+
+    functions(module: binaryen.Module): binaryen.FunctionRef[]
+
+    exports(): Record<string, string>
+
+    subExpressions(): Expression[]
+
 }
 
 export abstract class Value<A extends types.NumberArray> implements Expression {
@@ -26,6 +35,8 @@ export abstract class Value<A extends types.NumberArray> implements Expression {
 
     constructor(readonly type: types.Vector<A>) {
     }
+
+    abstract subExpressions(): Expression[]
 
     named(name: string | null = null): Value<A> {
         return new NamedValue(this, name)
@@ -76,18 +87,10 @@ export abstract class Value<A extends types.NumberArray> implements Expression {
 
     abstract primitiveExpression(component: number, module: binaryen.Module, variables: FunctionLocals): binaryen.ExpressionRef
 
+    memory(memoryAllocator: StaticMemoryAllocator): void {
+    }
+
     functions(module: binaryen.Module): binaryen.FunctionRef[] {
-        return [
-            ...this.vectorFunctions(module),
-            ...this.primitiveFunctions(module)
-        ]
-    }
-
-    vectorFunctions(module: binaryen.Module): binaryen.FunctionRef[] {
-        return []
-    }
-
-    primitiveFunctions(module: binaryen.Module): binaryen.FunctionRef[] {
         return []
     }
 
@@ -128,6 +131,10 @@ export class NamedValue<A extends types.NumberArray, S extends number> extends V
         this.isPublic = name != null
     }
 
+    subExpressions(): Expression[] {
+        return [this.wrapped]
+    }
+
     calculate(): number[] | null {
         return this.wrapped.get()
     }
@@ -151,19 +158,22 @@ export class NamedValue<A extends types.NumberArray, S extends number> extends V
 
     vectorFunctions(module: binaryen.Module): number[] {
         return [
-            addFunction(module, this.vectorName(), [], binaryen.i32, (params, variables) => 
-                this.wrapped.vectorExpression(module, variables)
-            )
+            
         ]
     }
 
-    primitiveFunctions(module: binaryen.Module): number[] {
+    functions(module: binaryen.Module): number[] {
         const [dataType, insType] = this.typeInfo(module)
-        return [...this.components(i => 
-            addFunction(module, this.primitiveName(i), [], dataType, (params, variables) => 
-                this.wrapped.primitiveExpression(i, module, variables)
+        return [
+            addFunction(module, this.vectorName(), [], binaryen.i32, (params, variables) => 
+                this.wrapped.vectorExpression(module, variables)
+            ),
+            ...this.components(i => 
+                addFunction(module, this.primitiveName(i), [], dataType, (params, variables) => 
+                    this.wrapped.primitiveExpression(i, module, variables)
+                )
             )
-        )]
+        ]
     }
     
     private vectorName(): string {
@@ -189,6 +199,12 @@ export interface Delay<A extends types.NumberArray> extends Expression {
     value: Value<A>
 
     at(index: Value<Int32Array>): Value<A>
+
+}
+
+export interface StaticMemoryAllocator {
+
+    declare<A extends types.NumberArray>(vector: types.Vector<A>, initialValue: number[]): number
 
 }
 

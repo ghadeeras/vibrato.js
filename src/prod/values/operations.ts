@@ -9,6 +9,10 @@ abstract class Reduction<A extends types.NumberArray, B extends types.NumberArra
         super(accumulator.type)
     }
 
+    subExpressions(): exps.Expression[] {
+        return[this.accumulator, ...this.operands]
+    }
+
     calculate(): number[] | null {
         return this.operands.reduce((acc, operand) => {
             if (acc == null) {
@@ -204,6 +208,10 @@ export class Dot extends exps.Value<Float64Array> {
             () => `Expected left and right operands to be the same size; found ${left.type.size} and ${right.type.size} instead.`, 
             left.type.size == right.type.size
         )
+    }
+
+    subExpressions(): exps.Expression[] {
+        return [this.left, this.right]
     }
 
     calculate(): number[] | null {

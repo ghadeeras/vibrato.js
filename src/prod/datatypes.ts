@@ -42,6 +42,8 @@ export interface Vector<A extends NumberArray> {
 
     flatView(buffer: ArrayBuffer, byteOffset?: number, length?: number): A
 
+    buffer(array: number[]): ArrayBuffer
+
 }
 
 class GenericRawView implements RawView {
@@ -137,6 +139,18 @@ class GenericVector<A extends NumberArray> implements Vector<A> {
 
     flatView(buffer: ArrayBuffer, byteOffset: number = 0, length: number = 1): A {
         return this.componentType.view(buffer, byteOffset, length * this.size)
+    }
+
+    buffer(array: number[]): ArrayBuffer {
+        if (array.length % this.size != 0) {
+            throw new Error(`Invalid array length! Expected multiples of ${this.size}; got ${array.length} instead!`);
+        }
+        const result = new ArrayBuffer(array.length * this.componentType.sizeInBytes)
+        const view = this.flatView(result)
+        for (let i = 0; i < array.length; i++) {
+            view[i] = array[i]
+        }
+        return result
     }
 
 }

@@ -6,15 +6,32 @@ import binaryen from 'binaryen'
 export class Literal<A extends types.NumberArray> extends exps.Value<A> {
 
     private value: number[]
+    private pointer: number | null = null
 
     private constructor(type: types.Vector<A>, value: number[]) {
         super(type)
         assert(() => `Expected ${type.size} vector components; found ${value.length}`, type.size == value.length)
         this.value = [...value]
     }
+
+    subExpressions(): exps.Expression[] {
+        return []
+    }
     
     calculate(): number[] {
         return this.value;
+    }
+
+    memory(memoryAllocator: exps.StaticMemoryAllocator): void {
+        if (this.type.size > 1) {
+            this.pointer = memoryAllocator.declare(this.type, this.value)
+        }
+    }
+
+    vectorExpression(module: binaryen.Module, variables: exps.FunctionLocals): binaryen.ExpressionRef {
+        return this.pointer != null ?
+            module.i32.const(this.pointer) :
+            super.vectorExpression(module, variables)
     }
 
     primitiveExpression(component: number, module: binaryen.Module, variables: exps.FunctionLocals): binaryen.ExpressionRef {
