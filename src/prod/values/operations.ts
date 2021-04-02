@@ -3,46 +3,38 @@ import * as exps from '../expressions'
 
 import binaryen from 'binaryen'
 
-abstract class Operation<A extends types.NumberArray> extends exps.Value<A> implements exps.Function<exps.Value<A>, exps.Value<A>> {
+abstract class Reduction<A extends types.NumberArray, B extends types.NumberArray> extends exps.Value<A> {
 
-    protected constructor(private name: string, type: types.Vector<A>, protected operands: exps.Value<A>[]) {
-        super(type)
-        assert(() => `Expected at least one operand; found ${operands.length}`, operands.length > 0)
-        for (let operand of operands) {
-            assert(() => `Expected ${type.size} operand vector components; found ${operand.type.size}`, type.size == operand.type.size)
-        }
+    protected constructor(protected name: string, protected accumulator: exps.Value<A>, protected operands: exps.Value<B>[]) {
+        super(accumulator.type)
     }
 
-    abstract apply(input: exps.Value<A>): exps.Value<A>
-    
     calculate(): number[] | null {
-        const [first, ...rest] = this.operands
-        return rest.reduce((acc, op) => {
+        return this.operands.reduce((acc, operand) => {
             if (acc == null) {
                 return null
             }
-            const value = op.get()
+            const value = operand.get()
             return value != null ? this.preApply(value, acc) : null
-        }, first.get())
+        }, this.accumulator.get())
     }
 
-    vectorSubExpressions(module: binaryen.Module, variablesIndex: number, dataType: binaryen.Type, instructionType: exps.BinaryenInstructionType): binaryen.ExpressionRef[] {
-        const [first, ...rest] = this.operands
-        return [
-            rest.reduce((acc, operand) => {
+    vectorSubExpressions(module: binaryen.Module, resultRef: exps.FunctionLocal, variables: exps.FunctionLocals): binaryen.ExpressionRef[] {
+        return [module.drop(
+            this.operands.reduce((acc, operand) => {
                 return this.block(module, [
                     module.call("enter", [], binaryen.none),
-                    module.drop(this.applicationFunction(module, acc, operand, variablesIndex, dataType, instructionType)),
-                    module.call("leave", [], binaryen.none),
-                    module.local.get(variablesIndex, binaryen.i32)
+                    module.call("return_i32", [this.applicationFunction(module, acc, operand, resultRef, variables)], binaryen.i32)
                 ])
-            }, first.vectorExpression(module, variablesIndex, dataType, instructionType))
-        ]
+            }, this.accumulator.vectorExpression(module, variables))
+        )]
     }
 
-    private applicationFunction(module: binaryen.Module, acc: number, operand: exps.Value<A>, variablesIndex: number, dataType: number, instructionType: exps.BinaryenInstructionType): number {
-        const operandValue = operand.vectorExpression(module, variablesIndex, dataType, instructionType)
-        const result = module.local.get(variablesIndex, binaryen.i32)
+    private applicationFunction(module: binaryen.Module, acc: number, operand: exps.Value<B>, resultRef: exps.FunctionLocal, variables: exps.FunctionLocals): number {
+        const operandValue = operand.type.size > 1 || operand.type.size == this.type.size ?
+            operand.vectorExpression(module, variables) :
+            operand.primitiveExpression(0, module, variables)
+        const result = resultRef.get()
         switch (this.type.size) {
             case 2: return module.call(`f64_vec2_${this.name}_r`, [acc, operandValue, result], binaryen.i32) 
             case 3: return module.call(`f64_vec3_${this.name}_r`, [acc, operandValue, result], binaryen.i32)
@@ -51,12 +43,14 @@ abstract class Operation<A extends types.NumberArray> extends exps.Value<A> impl
         }
     }
 
-    primitiveExpression(component: number, module: binaryen.Module, variablesIndex: number, dataType: binaryen.Type, instructionType: exps.BinaryenInstructionType): binaryen.ExpressionRef {
-        const [first, ...rest] = this.operands
-        return rest.reduce((acc, operand) => {
-            const operandValue = operand.primitiveExpression(component, module, variablesIndex, dataType, instructionType)
-            return this.applicationInstruction(module, instructionType)(acc, operandValue)
-        }, first.primitiveExpression(component, module, variablesIndex, dataType, instructionType))
+    primitiveExpression(component: number, module: binaryen.Module, variables: exps.FunctionLocals): binaryen.ExpressionRef {
+        const [dataType, insType] = this.typeInfo(module)
+        return this.operands.reduce((acc, operand) => {
+            const operandValue = operand.type.size > 1 ?
+                operand.primitiveExpression(component, module, variables) :
+                operand.primitiveExpression(0, module, variables)
+            return this.applicationInstruction(module, insType)(acc, operandValue)
+        }, this.accumulator.primitiveExpression(component, module, variables))
     }
 
     protected abstract preApply(acc: number[], value: number[]): number[]
@@ -65,104 +59,183 @@ abstract class Operation<A extends types.NumberArray> extends exps.Value<A> impl
 
 }
 
+abstract class Operation<A extends types.NumberArray> extends Reduction<A, A> {
+
+    protected constructor(name: string, accumulator: exps.Value<A>, operands: exps.Value<A>[]) {
+        super(name, accumulator, operands)
+        for (let operand of operands) {
+            assert(() => `Expected ${this.type.size} operand vector components; found ${operand.type.size}`, this.type.size == operand.type.size)
+        }
+    }
+
+}
+
 export class Add<A extends types.NumberArray> extends Operation<A> {
 
-    private constructor(type: types.Vector<A>, operands: exps.Value<A>[]) {
-        super("add", type, operands)
+    private constructor(accumulator: exps.Value<A>, operands: exps.Value<A>[]) {
+        super("add", accumulator, operands)
     }
     
-    apply(input: exps.Value<A>): exps.Value<A> {
-        const [first, ...rest] = this.operands 
-        return Add.add(first, ...rest, input)
-    }
-
     protected preApply(acc: number[], value: number[]): number[] {
-        return value.map((v, i) => acc[i] + v)
+        return acc.map((a, i) => a + value[i])
     }
 
     protected applicationInstruction(module: binaryen.Module, instructionType: exps.BinaryenInstructionType): (left: number, right: number) => number {
         return instructionType.add
     }
 
-    static add<A extends types.NumberArray>(firstOp: exps.Value<A>, ...restOps: exps.Value<A>[]) {
-        return new Add(firstOp.type, [firstOp, ...restOps])
+    static of<A extends types.NumberArray>(firstOp: exps.Value<A>, ...restOps: exps.Value<A>[]) {
+        return new Add(firstOp, restOps)
     }
     
 }
 
 export class Sub<A extends types.NumberArray> extends Operation<A> {
 
-    private constructor(type: types.Vector<A>, operands: exps.Value<A>[]) {
-        super("sub", type, operands)
+    private constructor(accumulator: exps.Value<A>, operands: exps.Value<A>[]) {
+        super("sub", accumulator, operands)
     }
     
-    apply(input: exps.Value<A>): exps.Value<A> {
-        const [first, ...rest] = this.operands 
-        return Sub.sub(first, ...rest, input)
-    }
-
     protected preApply(acc: number[], value: number[]): number[] {
-        return value.map((v, i) => acc[i] - v)
+        return acc.map((a, i) => a - value[i])
     }
 
     protected applicationInstruction(module: binaryen.Module, instructionType: exps.BinaryenInstructionType): (left: number, right: number) => number {
         return instructionType.sub
     }
 
-    static sub<A extends types.NumberArray>(firstOp: exps.Value<A>, ...restOps: exps.Value<A>[]) {
-        return new Sub(firstOp.type, [firstOp, ...restOps])
+    static of<A extends types.NumberArray>(firstOp: exps.Value<A>, ...restOps: exps.Value<A>[]) {
+        return new Sub(firstOp, restOps)
     }
     
 }
 
 export class Mul<A extends types.NumberArray> extends Operation<A> {
 
-    private constructor(type: types.Vector<A>, operands: exps.Value<A>[]) {
-        super("mul", type, operands)
+    private constructor(accumulator: exps.Value<A>, operands: exps.Value<A>[]) {
+        super("mul", accumulator, operands)
     }
     
-    apply(input: exps.Value<A>): exps.Value<A> {
-        const [first, ...rest] = this.operands 
-        return Mul.mul(first, ...rest, input)
-    }
-
     protected preApply(acc: number[], value: number[]): number[] {
-        return value.map((v, i) => acc[i] - v)
+        return acc.map((a, i) => a * value[i])
     }
 
     protected applicationInstruction(module: binaryen.Module, instructionType: exps.BinaryenInstructionType): (left: number, right: number) => number {
         return instructionType.mul
     }
 
-    static mul<A extends types.NumberArray>(firstOp: exps.Value<A>, ...restOps: exps.Value<A>[]) {
-        return new Mul(firstOp.type, [firstOp, ...restOps])
+    static of<A extends types.NumberArray>(firstOp: exps.Value<A>, ...restOps: exps.Value<A>[]) {
+        return new Mul(firstOp, restOps)
     }
     
 }
 
 export class Div extends Operation<Float64Array> {
 
-    private constructor(type: types.Vector<Float64Array>, operands: exps.Value<Float64Array>[]) {
-        super("div", type, operands)
+    private constructor(accumulator: exps.Value<Float64Array>, operands: exps.Value<Float64Array>[]) {
+        super("div", accumulator, operands)
     }
     
-    apply(input: exps.Value<Float64Array>): exps.Value<Float64Array> {
-        const [first, ...rest] = this.operands 
-        return Mul.mul(first, ...rest, input)
+    protected preApply(acc: number[], value: number[]): number[] {
+        return acc.map((a, i) => a / value[i])
     }
 
+    protected applicationInstruction(module: binaryen.Module, instructionType: exps.BinaryenInstructionType): (left: number, right: number) => number {
+        return module.f64.div;
+    }
+
+    static of(firstOp: exps.Value<Float64Array>, ...restOps: exps.Value<Float64Array>[]) {
+        return new Div(firstOp, restOps)
+    }
+    
+}
+
+export class ScalarMul<A extends types.NumberArray> extends Reduction<A, A> {
+
+    private constructor(accumulator: exps.Value<A>, operands: exps.Value<A>[]) {
+        super("scalar_mul", accumulator, operands)
+        for (let operand of operands) {
+            assert(() => `Expected primitive real operand; found vector of size ${operand.type.size}`, 1 == operand.type.size)
+        }
+    }
+    
     protected preApply(acc: number[], value: number[]): number[] {
-        return value.map((v, i) => acc[i] - v)
+        return acc.map(a => a * value[0])
+    }
+
+    protected applicationInstruction(module: binaryen.Module, instructionType: exps.BinaryenInstructionType): (left: number, right: number) => number {
+        return instructionType.mul
+    }
+
+    static of<A extends types.NumberArray>(firstOp: exps.Value<A>, ...restOps: exps.Value<A>[]) {
+        return new ScalarMul(firstOp, restOps)
+    }
+    
+}
+
+export class ScalarDiv extends Reduction<Float64Array, Float64Array> {
+
+    private constructor(accumulator: exps.Value<Float64Array>, operands: exps.Value<Float64Array>[]) {
+        super("scalar_div", accumulator, operands)
+        for (let operand of operands) {
+            assert(() => `Expected primitive real operand; found vector of size ${operand.type.size}`, 1 == operand.type.size)
+        }
+    }
+    
+    protected preApply(acc: number[], value: number[]): number[] {
+        return acc.map(a => a / value[0])
     }
 
     protected applicationInstruction(module: binaryen.Module, instructionType: exps.BinaryenInstructionType): (left: number, right: number) => number {
         return module.f64.div
     }
 
-    static div(firstOp: exps.Value<Float64Array>, ...restOps: exps.Value<Float64Array>[]) {
-        return new Div(firstOp.type, [firstOp, ...restOps])
+    static of(firstOp: exps.Value<Float64Array>, ...restOps: exps.Value<Float64Array>[]) {
+        return new ScalarDiv(firstOp, restOps)
     }
     
+}
+
+export class Dot extends exps.Value<Float64Array> {
+
+    protected constructor(protected left: exps.Value<Float64Array>, protected right: exps.Value<Float64Array>) {
+        super(types.scalar)
+        assert(
+            () => `Expected left and right operands to be the same size; found ${left.type.size} and ${right.type.size} instead.`, 
+            left.type.size == right.type.size
+        )
+    }
+
+    calculate(): number[] | null {
+        const v1 = this.left.calculate()
+        const v2 = this.right.calculate()
+        return v1 != null && v2 != null ? 
+            [v1.reduce((a, v1_i, i) => a + v1_i * v2[i], 0)] :
+            null
+    }
+
+    primitiveExpression(component: number, module: binaryen.Module, variables: exps.FunctionLocals): binaryen.ExpressionRef {
+        return this.block(module, [
+            module.call("enter", [], binaryen.none),
+            module.call("return_f64", [this.applicationFunction(module, variables)], binaryen.f64)
+        ])
+    }
+
+    private applicationFunction(module: binaryen.Module, variables: exps.FunctionLocals): number {
+        const leftValue = this.left.vectorExpression(module, variables)
+        const rightValue = this.right.vectorExpression(module, variables)
+        switch (this.left.type.size) {
+            case 2: return module.call(`f64_vec2_dot`, [leftValue, rightValue], binaryen.f64) 
+            case 3: return module.call(`f64_vec3_dot`, [leftValue, rightValue], binaryen.f64)
+            case 4: return module.call(`f64_vec4_dot`, [leftValue, rightValue], binaryen.f64)
+            default: return module.call(`f64_vec_dot`, [module.i32.const(this.left.type.size), leftValue, rightValue], binaryen.f64)
+        }
+    }
+
+    static of(left: exps.Value<Float64Array>, right: exps.Value<Float64Array>): Dot {
+        return new Dot(left, right);
+    }
+
 }
 
 function assert(message: () => string, condition: boolean) {

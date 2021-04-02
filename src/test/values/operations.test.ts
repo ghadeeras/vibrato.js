@@ -1,50 +1,63 @@
 import { expect } from 'chai'
 import { Literal } from '../../prod/values/literal'
-import { Add } from '../../prod/values/operations'
+import { Add, ScalarMul, Dot } from '../../prod/values/operations'
 import { Assembler } from '../../prod/assembler'
 import { initWaModulesFS } from '../../prod/rt'
-import { NumberArray } from '../../prod/datatypes'
+import { NumberArray, scalar } from '../../prod/datatypes'
 import { Value } from '../../prod/expressions'
 
 type TestExports = {
-    pi: () => number,
-    phi: () => number,
-    five: () => number,
-    seven: () => number,
-    vector1: () => number,
-    vector2: () => number,
+    fivePlusSeven: () => number,
 
     piPlusPhi: () => number,
-    fivePlusSeven: () => number,
+
     v1PlusV22D: () => number,
     v1PlusV23D: () => number,
     v1PlusV24D: () => number,
     v1PlusV2ND: () => number,
+
+    v1ScalarMul2D: () => number,
+    v1ScalarMul3D: () => number,
+    v1ScalarMul4D: () => number,
+    v1ScalarMulND: () => number,
+
+    v1DotV22D: () => number,
+    v1DotV23D: () => number,
+    v1DotV24D: () => number,
+    v1DotV2ND: () => number,
 }
 
 const five = Literal.discrete(5).named("five")
 const seven = Literal.discrete(7).named("seven")
-const fivePlusSeven = Add.add(five, seven).named("fivePlusSeven")
+const fivePlusSeven = Add.of(five, seven).named("fivePlusSeven")
 
 const pi = Literal.scalar(3.141).named("pi")
 const phi = Literal.scalar(1.618).named("phi")
-const piPlusPhi = Add.add(pi, phi).named("piPlusPhi")
+const piPlusPhi = Add.of(pi, phi).named("piPlusPhi")
 
 const vector2D1 = Literal.vector(1.2, 2.3).named("vector2D1")
 const vector2D2 = Literal.vector(3.2, -2.1).named("vector2D2")
-const v1PlusV22D = Add.add(vector2D1, vector2D2).named("v1PlusV22D")
+const v1PlusV22D = Add.of(vector2D1, vector2D2).named("v1PlusV22D")
+const v1ScalarMul2D = ScalarMul.of(vector2D1, pi).named("v1ScalarMul2D")
+const v1DotV22D = Dot.of(vector2D1, vector2D2).named("v1DotV22D")
 
 const vector3D1 = Literal.vector(1.2, 2.3, 3.4).named("vector3D1")
 const vector3D2 = Literal.vector(3.4, -2.3, -1.2).named("vector3D2")
-const v1PlusV23D = Add.add(vector3D1, vector3D2).named("v1PlusV23D")
+const v1PlusV23D = Add.of(vector3D1, vector3D2).named("v1PlusV23D")
+const v1ScalarMul3D = ScalarMul.of(vector3D1, pi).named("v1ScalarMul3D")
+const v1DotV23D = Dot.of(vector3D1, vector3D2).named("v1DotV23D")
 
 const vector4D1 = Literal.vector(1.2, 2.3, 3.4, 4.5).named("vector4D1")
 const vector4D2 = Literal.vector(3.4, -2.3, -1.2, 4.5).named("vector4D2")
-const v1PlusV24D = Add.add(vector4D1, vector4D2).named("v1PlusV24D")
+const v1PlusV24D = Add.of(vector4D1, vector4D2).named("v1PlusV24D")
+const v1ScalarMul4D = ScalarMul.of(vector4D1, pi).named("v1ScalarMul4D")
+const v1DotV24D = Dot.of(vector4D1, vector4D2).named("v1DotV24D")
 
 const vectorND1 = Literal.vector(1.2, 2.3, 3.4, 4.5, 5.6, 6.7, 7.8, 8.9).named("vectorND1")
 const vectorND2 = Literal.vector(3.4, -6.7, 1.2, -4.5, 7.8, -2.3, 5.6, 8.9).named("vectorND2")
-const v1PlusV2ND = Add.add(vectorND1, vectorND2).named("v1PlusV2ND")
+const v1PlusV2ND = Add.of(vectorND1, vectorND2).named("v1PlusV2ND")
+const v1ScalarMulND = ScalarMul.of(vectorND1, pi).named("v1ScalarMulND")
+const v1DotV2ND = Dot.of(vectorND1, vectorND2).named("v1DotV2ND")
 
 const assembler = new Assembler([
     five,
@@ -58,18 +71,26 @@ const assembler = new Assembler([
     vector2D1,        
     vector2D2,
     v1PlusV22D,
+    v1ScalarMul2D,
+    v1DotV22D,
 
     vector3D1,        
     vector3D2,
     v1PlusV23D,
+    v1ScalarMul3D,
+    v1DotV23D,
 
     vector4D1,        
     vector4D2,
     v1PlusV24D,
+    v1ScalarMul4D,
+    v1DotV24D,
 
     vectorND1,        
     vectorND2,
     v1PlusV2ND,
+    v1ScalarMulND,
+    v1DotV2ND
 ])
 
 console.log(assembler.textCode)
@@ -98,7 +119,7 @@ describe("Operations", () => {
         })
 
         it("rejects adding vectors of different sizes", () => {
-            expect(() => Add.add(vector3D1, vectorND1)).to.throw()
+            expect(() => Add.of(vector3D1, vectorND1)).to.throw()
         })
         
         it("calculates the addition of values", () => {
@@ -136,6 +157,74 @@ describe("Operations", () => {
         })
 
     })
+
+    describe("ScalarMul", () => {
+
+        it("produces value of same type as accumulator", () => {
+            expect(v1ScalarMul2D.type).to.deep.equal(vector2D1.type)
+            expect(v1ScalarMul3D.type).to.deep.equal(vector3D1.type)
+            expect(v1ScalarMul4D.type).to.deep.equal(vector4D1.type)
+            expect(v1ScalarMulND.type).to.deep.equal(vectorND1.type)
+        })
+
+        it("rejects non scalar operands", () => {
+            expect(() => ScalarMul.of(vector3D1, vector3D2)).to.throw()
+        })
+        
+        it("calculates scalar multiplication of values", () => {
+            vector(v1ScalarMul2D).forEach((c, i) => 
+                expect(c).to.equal(component(vector2D1, i) * primitive(pi))
+            )
+            vector(v1ScalarMul3D).forEach((c, i) => 
+                expect(c).to.equal(component(vector3D1, i) * primitive(pi))
+            )
+            vector(v1ScalarMul4D).forEach((c, i) => 
+                expect(c).to.equal(component(vector4D1, i) * primitive(pi))
+            )
+            vector(v1ScalarMulND).forEach((c, i) => 
+                expect(c).to.equal(component(vectorND1, i) * primitive(pi))
+            )
+        })
+
+        it("generates the scalar multiplication of values", () => {
+            dereference(v1ScalarMul2D, test.v1ScalarMul2D()).forEach((c, i) => 
+                expect(c).to.equal(component(vector2D1, i) * primitive(pi))
+            )
+            dereference(v1ScalarMul3D, test.v1ScalarMul3D()).forEach((c, i) => 
+                expect(c).to.equal(component(vector3D1, i) * primitive(pi))
+            )
+            dereference(v1ScalarMul4D, test.v1ScalarMul4D()).forEach((c, i) => 
+                expect(c).to.equal(component(vector4D1, i) * primitive(pi))
+            )
+            dereference(v1ScalarMulND, test.v1ScalarMulND()).forEach((c, i) => 
+                expect(c).to.equal(component(vectorND1, i) * primitive(pi))
+            )
+        })
+
+    })
+
+    describe("Dot", () => {
+
+        it("produces scalar value", () => {
+            expect(v1DotV22D.type).to.deep.equal(scalar)
+            expect(v1DotV23D.type).to.deep.equal(scalar)
+            expect(v1DotV24D.type).to.deep.equal(scalar)
+            expect(v1DotV2ND.type).to.deep.equal(scalar)
+        })
+
+        it("rejects operands of unequal size", () => {
+            expect(() => Dot.of(vector3D1, vectorND2)).to.throw()
+        })
+        
+        it("calculates and generates dot product of vectors", () => {
+            expect(test.v1DotV22D()).to.equal(primitive(v1DotV22D))
+            expect(test.v1DotV23D()).to.equal(primitive(v1DotV23D))
+            expect(test.v1DotV24D()).to.equal(primitive(v1DotV24D))
+            expect(test.v1DotV2ND()).to.equal(primitive(v1DotV2ND))
+        })
+
+    })
+
 })
 
 function primitive<T extends NumberArray>(vector: Value<T>) {

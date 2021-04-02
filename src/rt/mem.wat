@@ -92,6 +92,26 @@
         )
     )
 
+    (func $return_i32 (param $result i32) (result i32)
+        (call $leave)
+        (local.get $result)
+    )
+
+    (func $return_i64 (param $result i64) (result i64)
+        (call $leave)
+        (local.get $result)
+    )
+
+    (func $return_f32 (param $result f32) (result f32)
+        (call $leave)
+        (local.get $result)
+    )
+
+    (func $return_f64 (param $result f64) (result f64)
+        (call $leave)
+        (local.get $result)
+    )
+
     (func $allocate8 (param $size i32) (result i32)
         (local $ref i32)
         (call $grow (local.get $size))
@@ -159,6 +179,10 @@
 
     (export "enter" (func $enter))
     (export "leave" (func $leave))
+    (export "return_i32" (func $return_i32))
+    (export "return_i64" (func $return_i64))
+    (export "return_f32" (func $return_f32))
+    (export "return_f64" (func $return_f64))
     (export "allocate8" (func $allocate8))
     (export "allocate16" (func $allocate16))
     (export "allocate32" (func $allocate32))

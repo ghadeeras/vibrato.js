@@ -49,59 +49,45 @@ export abstract class Value<A extends types.NumberArray> implements Expression {
         return {}
     }
 
-    expression(module: binaryen.Module, variablesIndex: number = 0): binaryen.ExpressionRef {
-        const [dataType, insType] = this.typeInfo(module)
+    expression(module: binaryen.Module, variables: FunctionLocals): binaryen.ExpressionRef {
         return this.type.size > 1 ? 
-            this.vectorExpression(module, variablesIndex, dataType, insType) :
-            this.primitiveExpression(0, module, variablesIndex, dataType, insType)
+            this.vectorExpression(module, variables) :
+            this.primitiveExpression(0, module, variables)
     }
 
-    vectorExpression(module: binaryen.Module, variablesIndex: number, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.ExpressionRef {
+    vectorExpression(module: binaryen.Module, variables: FunctionLocals): binaryen.ExpressionRef {
+        const resultRef = variables.declare(binaryen.i32) 
         return this.block(module, [
-            module.local.set(variablesIndex, this.allocateResultSpace(module)),
-            ...this.vectorSubExpressions(module, variablesIndex, dataType, instructionType),
-            module.local.get(variablesIndex, binaryen.i32)
+            resultRef.set(this.allocateResultSpace(module)),
+            ...this.vectorSubExpressions(module, resultRef, variables),
+            resultRef.get()
         ])
     }
 
-    vectorSubExpressions(module: binaryen.Module, variablesIndex: number, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.ExpressionRef[] {
+    vectorSubExpressions(module: binaryen.Module, resultRef: FunctionLocal, variables: FunctionLocals): binaryen.ExpressionRef[] {
+        const [dataType, insType] = this.typeInfo(module)
         return [...this.components(i => 
-            instructionType.store(i * this.type.componentType.sizeInBytes, 0,
-                module.local.get(variablesIndex, binaryen.i32),
-                this.primitiveExpression(i, module, variablesIndex, dataType, instructionType)
+            insType.store(i * this.type.componentType.sizeInBytes, 0,
+                resultRef.get(),
+                this.primitiveExpression(i, module, variables)
             )
         )]
     }
 
-    abstract primitiveExpression(component: number, module: binaryen.Module, variablesIndex: number, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.ExpressionRef
-
-    variables(): binaryen.Type[] {
-        return this.type.size > 1 ?
-            this.vectorExpressionVariables() :
-            this.primitiveExpressionVariables()
-    }
-
-    vectorExpressionVariables(): binaryen.Type[] {
-        return [binaryen.i32]
-    }
-
-    primitiveExpressionVariables(): binaryen.Type[] {
-        return []
-    }
+    abstract primitiveExpression(component: number, module: binaryen.Module, variables: FunctionLocals): binaryen.ExpressionRef
 
     functions(module: binaryen.Module): binaryen.FunctionRef[] {
-        const [dataType, insType] = this.typeInfo(module)
         return [
-            ...this.vectorFunctions(module, dataType, insType),
-            ...this.primitiveFunctions(module, dataType, insType)
+            ...this.vectorFunctions(module),
+            ...this.primitiveFunctions(module)
         ]
     }
 
-    vectorFunctions(module: binaryen.Module, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.FunctionRef[] {
+    vectorFunctions(module: binaryen.Module): binaryen.FunctionRef[] {
         return []
     }
 
-    primitiveFunctions(module: binaryen.Module, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.FunctionRef[] {
+    primitiveFunctions(module: binaryen.Module): binaryen.FunctionRef[] {
         return []
     }
 
@@ -154,30 +140,28 @@ export class NamedValue<A extends types.NumberArray, S extends number> extends V
         } : {}
     }
 
-    vectorExpressionVariables(): binaryen.Type[] {
-        return []
-    }
-
-    vectorExpression(module: binaryen.Module, variablesIndex: binaryen.ExpressionRef, dataType: binaryen.Type, instructionType: BinaryenInstructionType): binaryen.ExpressionRef {
+    vectorExpression(module: binaryen.Module, variables: FunctionLocals): binaryen.ExpressionRef {
         return module.call(this.vectorName(), [], binaryen.i32)
     }
 
-    primitiveExpression(component: number, module: binaryen.Module, variablesIndex: number, dataType: number, instructionType: BinaryenInstructionType): number {
+    primitiveExpression(component: number, module: binaryen.Module, variables: FunctionLocals): number {
+        const [dataType, insType] = this.typeInfo(module)
         return module.call(this.primitiveName(component), [], dataType)
     }
 
-    vectorFunctions(module: binaryen.Module, dataType: number, instructionType: BinaryenInstructionType): number[] {
+    vectorFunctions(module: binaryen.Module): number[] {
         return [
-            module.addFunction(this.vectorName(), binaryen.createType([]), binaryen.i32, this.wrapped.vectorExpressionVariables(), 
-                this.wrapped.vectorExpression(module, 0, dataType, instructionType)
+            addFunction(module, this.vectorName(), [], binaryen.i32, (params, variables) => 
+                this.wrapped.vectorExpression(module, variables)
             )
         ]
     }
 
-    primitiveFunctions(module: binaryen.Module, dataType: number, instructionType: BinaryenInstructionType): number[] {
+    primitiveFunctions(module: binaryen.Module): number[] {
+        const [dataType, insType] = this.typeInfo(module)
         return [...this.components(i => 
-            module.addFunction(this.primitiveName(i), binaryen.createType([]), dataType, [], 
-                this.wrapped.primitiveExpression(i, module, 0, dataType, instructionType)
+            addFunction(module, this.primitiveName(i), [], dataType, (params, variables) => 
+                this.wrapped.primitiveExpression(i, module, variables)
             )
         )]
     }
@@ -206,4 +190,61 @@ export interface Delay<A extends types.NumberArray> extends Expression {
 
     at(index: Value<Int32Array>): Value<A>
 
+}
+
+export class FunctionLocals {
+
+    readonly locals: FunctionLocal[] = []
+
+    constructor(readonly module: binaryen.Module) {
+    }
+
+    declare(type: binaryen.Type): FunctionLocal {
+        const local = new FunctionLocal(this.module, type, this.locals.length)
+        this.locals.push(local)
+        return local
+    }
+
+    get localTypes(): binaryen.Type[] {
+        return this.locals.map(local => local.type)
+    } 
+
+}
+
+export class FunctionLocal {
+
+    constructor(readonly module: binaryen.Module, readonly type: binaryen.Type, readonly index: number) {
+    }
+
+    get(): binaryen.ExpressionRef {
+        return this.module.local.get(this.index, this.type)
+    }
+
+    set(value: number): binaryen.ExpressionRef {
+        return this.module.local.set(this.index, value)
+    }
+
+    tee(value: number): binaryen.ExpressionRef {
+        return this.module.local.tee(this.index, value, this.type)
+    }
+
+}
+
+export function addFunction(
+    module: binaryen.Module, 
+    name: string,
+    signature: binaryen.Type[], 
+    returnType: binaryen.Type, 
+    bodyBuilder: (params: FunctionLocal[], variables: FunctionLocals) => binaryen.ExpressionRef
+) {
+    const locals = new FunctionLocals(module)
+    const params = signature.map(type => locals.declare(type))
+    const body = bodyBuilder(params, locals)
+    return module.addFunction(
+        name, 
+        binaryen.createType(signature), 
+        returnType, 
+        locals.localTypes.slice(params.length), 
+        body
+    )
 }

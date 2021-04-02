@@ -17,8 +17,9 @@ export class Literal<A extends types.NumberArray> extends exps.Value<A> {
         return this.value;
     }
 
-    primitiveExpression(component: number, module: binaryen.Module, variablesIndex: number, dataType: binaryen.Type, instructionType: exps.BinaryenInstructionType): binaryen.ExpressionRef {
-        return instructionType.const(this.value[component])
+    primitiveExpression(component: number, module: binaryen.Module, variables: exps.FunctionLocals): binaryen.ExpressionRef {
+        const [dataType, insType] = this.typeInfo(module)
+        return insType.const(this.value[component])
     }
 
     static discrete(value: number) {

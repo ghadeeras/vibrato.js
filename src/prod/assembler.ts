@@ -13,6 +13,8 @@ export class Assembler {
     constructor(values: exps.Value<types.NumberArray>[]) {
         const module = new binaryen.Module();
 
+        module.setMemory(1, 65536)
+
         rt.addImportsToModule(module)
         
         for (let value of values) {
@@ -23,9 +25,14 @@ export class Assembler {
             }
         }
 
+        if (!module.validate()) {
+            throw new Error("Web Assembly module validation failed!")
+        }
+
         module.optimize();
         this.textCode = module.emitText();
         this.binaryCode = module.emitBinary();
+        
         module.dispose();
     }
 

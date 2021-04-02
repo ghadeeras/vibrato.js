@@ -10,6 +10,10 @@ export type MemExports = {
 
     enter: () => void;
     leave: () => void;
+    return_i32: (result: number) => number;
+    return_i64: (result: number) => number;
+    return_f32: (result: number) => number;
+    return_f64: (result: number) => number;
 
     allocate8: (size: number) => Reference;
     allocate16: (size: number) => Reference;
@@ -108,6 +112,10 @@ export function addMemImportsToModule(module: binaryen.Module) {
     module.addMemoryImport("stack", "mem", "stack")
     module.addFunctionImport("enter", "mem", "enter", binaryen.createType([]), binaryen.none)
     module.addFunctionImport("leave", "mem", "leave", binaryen.createType([]), binaryen.none)
+    module.addFunctionImport("return_i32", "mem", "return_i32", binaryen.createType([binaryen.i32]), binaryen.i32)
+    module.addFunctionImport("return_i64", "mem", "return_i64", binaryen.createType([binaryen.i64]), binaryen.i64)
+    module.addFunctionImport("return_f32", "mem", "return_f32", binaryen.createType([binaryen.f32]), binaryen.f32)
+    module.addFunctionImport("return_f64", "mem", "return_f64", binaryen.createType([binaryen.f64]), binaryen.f64)
 
     module.addFunctionImport("allocate8", "mem", "allocate8", binaryen.createType([binaryen.i32]), binaryen.i32)
     module.addFunctionImport("allocate16", "mem", "allocate16", binaryen.createType([binaryen.i32]), binaryen.i32)
@@ -126,13 +134,13 @@ export function addSpaceImportsToModule(module: binaryen.Module) {
     const vec1_vec2_result = binaryen.createType([binaryen.i32, binaryen.i32, binaryen.i32]);
     const size_vec1_vec2_result = binaryen.createType([binaryen.i32, binaryen.i32, binaryen.i32, binaryen.i32]);
     const vec_scalar = binaryen.createType([binaryen.i32, binaryen.f64]);
-    const size_vec_scalar = binaryen.createType([binaryen.i32, binaryen.f64]);
+    const size_vec_scalar = binaryen.createType([binaryen.i32, binaryen.i32, binaryen.f64]);
     const vec_scalar_result = binaryen.createType([binaryen.i32, binaryen.f64, binaryen.i32]);
-    const size_vec_scalar_result = binaryen.createType([binaryen.i32, binaryen.f64, binaryen.i32]);
+    const size_vec_scalar_result = binaryen.createType([binaryen.i32, binaryen.i32, binaryen.f64, binaryen.i32]);
     const vec = binaryen.createType([binaryen.i32]);
-    const size_vec = binaryen.createType([binaryen.i32]);
+    const size_vec = binaryen.createType([binaryen.i32, binaryen.i32]);
     const vec_result = binaryen.createType([binaryen.i32, binaryen.i32]);
-    const size_vec_result = binaryen.createType([binaryen.i32, binaryen.i32]);
+    const size_vec_result = binaryen.createType([binaryen.i32, binaryen.i32, binaryen.i32]);
 
     module.addFunctionImport("f64_vec2_add", "space", "f64_vec2_add", vec1_vec2, binaryen.i32)
     module.addFunctionImport("f64_vec2_add_r", "space", "f64_vec2_add_r", vec1_vec2_result, binaryen.i32)
@@ -193,10 +201,10 @@ export function addSpaceImportsToModule(module: binaryen.Module) {
     module.addFunctionImport("f64_vec4_dot", "space", "f64_vec4_dot", vec1_vec2, binaryen.f64)
     module.addFunctionImport("f64_vec_dot", "space", "f64_vec_dot", vec1_vec2_result, binaryen.f64)
 
-    module.addFunctionImport("f64_vec2_length", "space", "f64_vec2_dot", vec, binaryen.f64)
-    module.addFunctionImport("f64_vec3_length", "space", "f64_vec3_dot", vec, binaryen.f64)
-    module.addFunctionImport("f64_vec4_length", "space", "f64_vec4_dot", vec, binaryen.f64)
-    module.addFunctionImport("f64_vec_length", "space", "f64_vec_dot", size_vec, binaryen.f64)
+    module.addFunctionImport("f64_vec2_length", "space", "f64_vec2_length", vec, binaryen.f64)
+    module.addFunctionImport("f64_vec3_length", "space", "f64_vec3_length", vec, binaryen.f64)
+    module.addFunctionImport("f64_vec4_length", "space", "f64_vec4_length", vec, binaryen.f64)
+    module.addFunctionImport("f64_vec_length", "space", "f64_vec_length", size_vec, binaryen.f64)
 
     module.addFunctionImport("f64_vec2_normalize", "space", "f64_vec2_normalize", vec, binaryen.i32)
     module.addFunctionImport("f64_vec2_normalize_r", "space", "f64_vec2_normalize_r", vec_result, binaryen.i32)
