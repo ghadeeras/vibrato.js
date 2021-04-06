@@ -103,9 +103,18 @@ export type SpaceExports = {
 
 }
 
+export type DelayExports = {
+
+    create_delay: (delay_length: number, item_size: number) => Reference
+    item_ref: (delay_ref: Reference, index: number) => Reference
+    rotate: (delay_ref: Reference) => Reference
+
+}
+
 export function addImportsToModule(module: binaryen.Module) {
     addMemImportsToModule(module)
     addSpaceImportsToModule(module)
+    addDelayImportsToModule(module)
 }
 
 export function addMemImportsToModule(module: binaryen.Module) {
@@ -216,19 +225,26 @@ export function addSpaceImportsToModule(module: binaryen.Module) {
     module.addFunctionImport("f64_vec_normalize_r", "space", "f64_vec_normalize_r", size_vec_result, binaryen.i32)
 }
 
+export function addDelayImportsToModule(module: binaryen.Module) {
+    module.addFunctionImport("create_delay", "delay", "create_delay", binaryen.createType([binaryen.i32, binaryen.i32]), binaryen.i32)
+    module.addFunctionImport("item_ref", "delay", "item_ref", binaryen.createType([binaryen.i32, binaryen.i32]), binaryen.i32)
+    module.addFunctionImport("rotate", "delay", "rotate", binaryen.createType([binaryen.i32]), binaryen.i32)
+}
+
 function modules(){
     return {
         mem: wa.module<MemExports>("mem.wasm"),
-        space: wa.module<SpaceExports>("space.wasm")
+        space: wa.module<SpaceExports>("space.wasm"),
+        delay: wa.module<DelayExports>("delay.wasm"),
     }
 } 
 
 export type RuntimeModules = ReturnType<typeof modules>
 
 export async function initWaModulesWeb(waPath: string) {
-    return wa.loadWeb(waPath, modules(), "mem", "space");
+    return wa.loadWeb(waPath, modules(), "mem", "space", "delay");
 }
 
 export function initWaModulesFS(waPath: string) {
-    return wa.loadFS(waPath, modules(), "mem", "space");
+    return wa.loadFS(waPath, modules(), "mem", "space", "delay");
 }

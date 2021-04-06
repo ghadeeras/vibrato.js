@@ -27,34 +27,34 @@ type TestExports = {
     v1DotV2ND: () => number,
 }
 
-const five = Literal.discrete(5)
-const seven = Literal.discrete(7)
+const five = Literal.discrete(5).named("five")
+const seven = Literal.discrete(7).named("seven")
 const fivePlusSeven = Add.of(five, seven).named("fivePlusSeven")
 
-const pi = Literal.scalar(3.141)
-const phi = Literal.scalar(1.618)
+const pi = Literal.scalar(3.141).named("pi")
+const phi = Literal.scalar(1.618).named("phi")
 const piPlusPhi = Add.of(pi, phi).named("piPlusPhi")
 
-const vector2D1 = Literal.vector(1.2, 2.3)
-const vector2D2 = Literal.vector(3.2, -2.1)
+const vector2D1 = Literal.vector(1.2, 2.3).named("vector2D1")
+const vector2D2 = Literal.vector(3.2, -2.1).named("vector2D2")
 const v1PlusV22D = Add.of(vector2D1, vector2D2).named("v1PlusV22D")
 const v1ScalarMul2D = ScalarMul.of(vector2D1, pi).named("v1ScalarMul2D")
 const v1DotV22D = Dot.of(vector2D1, vector2D2).named("v1DotV22D")
 
-const vector3D1 = Literal.vector(1.2, 2.3, 3.4)
-const vector3D2 = Literal.vector(3.4, -2.3, -1.2)
+const vector3D1 = Literal.vector(1.2, 2.3, 3.4).named("vector3D1")
+const vector3D2 = Literal.vector(3.4, -2.3, -1.2).named("vector3D2")
 const v1PlusV23D = Add.of(vector3D1, vector3D2).named("v1PlusV23D")
 const v1ScalarMul3D = ScalarMul.of(vector3D1, pi).named("v1ScalarMul3D")
 const v1DotV23D = Dot.of(vector3D1, vector3D2).named("v1DotV23D")
 
-const vector4D1 = Literal.vector(1.2, 2.3, 3.4, 4.5)
-const vector4D2 = Literal.vector(3.4, -2.3, -1.2, 4.5)
+const vector4D1 = Literal.vector(1.2, 2.3, 3.4, 4.5).named("vector4D1")
+const vector4D2 = Literal.vector(3.4, -2.3, -1.2, 4.5).named("vector4D2")
 const v1PlusV24D = Add.of(vector4D1, vector4D2).named("v1PlusV24D")
 const v1ScalarMul4D = ScalarMul.of(vector4D1, pi).named("v1ScalarMul4D")
 const v1DotV24D = Dot.of(vector4D1, vector4D2).named("v1DotV24D")
 
-const vectorND1 = Literal.vector(1.2, 2.3, 3.4, 4.5, 5.6, 6.7, 7.8, 8.9)
-const vectorND2 = Literal.vector(3.4, -6.7, 1.2, -4.5, 7.8, -2.3, 5.6, 8.9)
+const vectorND1 = Literal.vector(1.2, 2.3, 3.4, 4.5, 5.6, 6.7, 7.8, 8.9).named("vectorND1")
+const vectorND2 = Literal.vector(3.4, -6.7, 1.2, -4.5, 7.8, -2.3, 5.6, 8.9).named("vectorND2")
 const v1PlusV2ND = Add.of(vectorND1, vectorND2).named("v1PlusV2ND")
 const v1ScalarMulND = ScalarMul.of(vectorND1, pi).named("v1ScalarMulND")
 const v1DotV2ND = Dot.of(vectorND1, vectorND2).named("v1DotV2ND")

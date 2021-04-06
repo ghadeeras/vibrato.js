@@ -156,12 +156,6 @@ export class NamedValue<A extends types.NumberArray, S extends number> extends V
         return module.call(this.primitiveName(component), [], dataType)
     }
 
-    vectorFunctions(module: binaryen.Module): number[] {
-        return [
-            
-        ]
-    }
-
     functions(module: binaryen.Module): number[] {
         const [dataType, insType] = this.typeInfo(module)
         return [

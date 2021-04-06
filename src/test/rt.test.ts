@@ -5,6 +5,7 @@ import * as dt from '../prod/datatypes'
 const rtModules = rt.initWaModulesFS("./out/rt")
 const mem = notNull(rtModules.mem.exports, "Couldn't load Vibrato runtime 'mem' module !")
 const space = notNull(rtModules.space.exports, "Couldn't load Vibrato runtime 'space' module!")
+const delay = notNull(rtModules.delay.exports, "Couldn't load Vibrato runtime 'delay' module!")
 
 describe("Runtime", () => {
 
@@ -92,6 +93,66 @@ describe("Runtime", () => {
                 }
             })
     
+        })
+
+    })
+
+    describe("delay", () => {
+
+        const vectorND = dt.vectorOf(randomInt(5, 64), dt.real)
+
+        it("initializes a delay line", () => {
+            const delayLineLength = randomInt(5, 64)
+            const delayLine = delay.create_delay(delayLineLength, vectorND.sizeInBytes)
+
+            const [
+                length, 
+                itemSize, 
+                bufferSize, 
+                bufferLoRef, 
+                bufferHiRef, 
+                firstItemRef
+            ] = dt.vectorOf(6, dt.integer).view(mem.stack.buffer, delayLine)[0]
+            
+            expect(length).to.equal(delayLineLength)
+            expect(itemSize).to.equal(vectorND.sizeInBytes)
+            expect(bufferSize).to.equal(length * itemSize)
+            expect(bufferLoRef).to.equal(delayLine + 6 * dt.integer.sizeInBytes)
+            expect(bufferHiRef - bufferLoRef).to.equal(bufferSize)
+            expect(firstItemRef).to.equal(bufferLoRef)
+        })
+
+        it("allows random access into a delay", () => {
+            const delayLineLength = randomInt(5, 64)
+            const delayLine = delay.create_delay(delayLineLength, vectorND.sizeInBytes)
+            
+            const first = delay.item_ref(delayLine, 0)
+            const last = delay.item_ref(delayLine, delayLineLength - 1)
+            
+            expect(last + vectorND.sizeInBytes - first).to.equal(delayLineLength * vectorND.sizeInBytes)
+            expect(delay.item_ref(delayLine, -delayLineLength)).to.equal(first)
+            expect(delay.item_ref(delayLine, -1)).to.equal(last)
+
+            const index = randomInt(0, 0x10000)
+            expect(delay.item_ref(delayLine, +index)).to.equal(delay.item_ref(delayLine, +(index % delayLineLength)))
+            expect(delay.item_ref(delayLine, -index)).to.equal(delay.item_ref(delayLine, -(index % delayLineLength)))
+        })
+
+        it("allows rotating a delay", () => {
+            const delayLineLength = randomInt(5, 64)
+            const delayLine = delay.create_delay(delayLineLength, vectorND.sizeInBytes)
+            
+            const prevFirst = delay.item_ref(delayLine, -delayLineLength)
+            const prevLast = delay.item_ref(delayLine, -1)
+
+            delay.rotate(delayLine)
+            
+            const first = delay.item_ref(delayLine, -delayLineLength)
+            const last = delay.item_ref(delayLine, -1)
+
+            expect(first).to.equal(prevFirst + vectorND.sizeInBytes)
+            expect(last).to.equal(prevFirst)
+            expect(delay.item_ref(delayLine, -2)).to.equal(prevLast)
         })
 
     })
