@@ -44,6 +44,8 @@ export interface Vector<A extends NumberArray> {
 
     buffer(array: number[]): ArrayBuffer
 
+    assignableFrom<V extends Vector<A>>(vector: V): boolean
+
 }
 
 class GenericRawView implements RawView {
@@ -151,6 +153,10 @@ class GenericVector<A extends NumberArray> implements Vector<A> {
             view[i] = array[i]
         }
         return result
+    }
+
+    assignableFrom<V extends Vector<A>>(vector: V): boolean {
+        return vector instanceof this.constructor && vector.size == this.size && vector.componentType === this.componentType
     }
 
 }

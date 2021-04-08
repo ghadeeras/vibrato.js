@@ -5,6 +5,7 @@ import binaryen from 'binaryen'
 
 let sequenceBlocks = 0
 let sequenceValues = 0
+let sequenceDelays = 0
 
 export function newBlockName(): string {
     return `_B_${sequenceBlocks++}`
@@ -14,17 +15,25 @@ export function newValueName(): string {
     return `_V_${sequenceValues++}`
 }
 
+export function newDelayName(): string {
+    return `_D_${sequenceDelays++}`
+}
+
 export type BinaryenInstructionType = binaryen.Module["i32"] | binaryen.Module["f64"]
 
 export interface Expression {
+
+    subExpressions(): Expression[]
 
     memory(memoryAllocator: StaticMemoryAllocator): void
 
     functions(module: binaryen.Module): binaryen.FunctionRef[]
 
-    exports(): Record<string, string>
+    read(module: binaryen.Module): binaryen.ExpressionRef[]
 
-    subExpressions(): Expression[]
+    write(module: binaryen.Module): binaryen.ExpressionRef[]
+
+    exports(): Record<string, string>
 
 }
 
@@ -42,8 +51,8 @@ export abstract class Value<A extends types.NumberArray> implements Expression {
         return new NamedValue(this, name)
     }
     
-    delay<L extends number>(length: L): Delay<A> {
-        throw new Error('Method not implemented.');
+    delay(length: number): Delay<A> {
+        return Delay.create(length, this.type, () => this)
     }
 
     get(): number[] | null {
@@ -91,6 +100,14 @@ export abstract class Value<A extends types.NumberArray> implements Expression {
     }
 
     functions(module: binaryen.Module): binaryen.FunctionRef[] {
+        return []
+    }
+
+    read(module: binaryen.Module): binaryen.ExpressionRef[] {
+        return []
+    }
+
+    write(module: binaryen.Module): binaryen.ExpressionRef[] {
         return []
     }
 
@@ -186,13 +203,159 @@ export interface Function<I extends Expression, O extends Expression> extends Ex
 
 }
 
-export interface Delay<A extends types.NumberArray> extends Expression {
+export class Delay<A extends types.NumberArray> implements Expression {
 
-    length: number
+    private readonly name: string
+    private readonly value: Value<A>
+    private readonly isPublic: boolean
+    
+    private nextValueRef: rt.Reference = -1
+    private delayRef: rt.Reference = -1
+    private delayBufferRef: rt.Reference = -1
+    
+    private constructor(name: string | null, readonly length: number, readonly type: types.Vector<A>, value: (d: Delay<A>) => Value<A>) {
+        this.name = name != null ? name : newDelayName()
+        this.value = value(this)
+        this.isPublic = name != null
+        if (!type.assignableFrom(this.value.type)) {
+            throw new Error("Incompatible types!")
+        }
+    }
 
-    value: Value<A>
+    static create<A extends types.NumberArray>(length: number, type: types.Vector<A>, value: (d: Delay<A>) => Value<A>) {
+        return new Delay(null, length, type, value)
+    }
 
-    at(index: Value<Int32Array>): Value<A>
+    static createNamed<A extends types.NumberArray>(name: string, length: number, type: types.Vector<A>, value: (d: Delay<A>) => Value<A>) {
+        return new Delay(name, length, type, value)
+    }
+
+    private readerName(): string {
+        return `${this.name}_read`
+    }
+
+    private writerName(): string {
+        return `${this.name}_write`
+    }
+
+    get delayReference(): rt.Reference {
+        return this.delayRef
+    }
+
+    get delayBufferReference(): rt.Reference {
+        return this.delayBufferRef
+    }
+
+    memory(memoryAllocator: StaticMemoryAllocator): void {
+        const bufferSize = this.length * this.type.size
+        const headerType = types.vectorOf(6, types.integer)
+        const bufferType = types.vectorOf(bufferSize, this.type.componentType)
+
+        // Room for next value (scalar or reference). This also forces 64-bit alignment
+        this.nextValueRef = memoryAllocator.declare(types.scalar, [0])
+        
+        this.delayRef = this.nextValueRef + types.scalar.sizeInBytes        
+        this.delayBufferRef = this.length > 1 ? this.delayRef + headerType.sizeInBytes : this.delayRef
+
+        if (this.length > 1) {
+            // Adjacent room for delay header
+            const delayRef = memoryAllocator.declare(headerType, [
+                this.length,
+                this.type.sizeInBytes, // Item size
+                bufferType.sizeInBytes,
+                this.delayBufferRef, // Buffer low bound (inclusive)
+                this.delayBufferRef + bufferType.sizeInBytes, // Buffer high bound (exclusive)
+                this.delayBufferRef // First item ref
+            ])
+            if (delayRef != this.delayRef) {
+                throw new Error('Delay header memory allocation did not go as expected!')
+            }
+        }
+
+        // Adjacent room for delay buffer
+        const buffer = new Array<number>(bufferType.size)
+        const delayBufferRef = memoryAllocator.declare(bufferType, buffer.fill(0))
+        if (delayBufferRef != this.delayBufferRef) {
+            throw new Error('Delay buffer memory allocation did not go as expected!')
+        }
+    }
+
+    functions(module: binaryen.Module): binaryen.FunctionRef[] {
+        const insType = this.type.size > 1 || this.type.componentType == types.integer ? module.i32 : module.f64
+        const nextValue = insType.load(0, 0, module.i32.const(this.nextValueRef))
+        const firstValueRef = this.length > 1 ? 
+            module.call("rotate", [module.i32.const(this.delayRef)], binaryen.i32) :
+            module.i32.const(this.delayBufferRef)
+        return [
+            addFunction(module, this.readerName(), [], binaryen.none, (params, vars) =>
+                insType.store(0, 0, module.i32.const(this.nextValueRef), this.value.expression(module, vars))
+            ),
+            addFunction(module, this.writerName(), [], binaryen.none, (params, vars) =>
+                this.type.size > 1 ? 
+                    module.memory.copy(firstValueRef, nextValue, module.i32.const(this.type.sizeInBytes)) :
+                    insType.store(0, 0, firstValueRef, nextValue)
+            ),
+        ]
+    }
+
+    read(module: binaryen.Module): binaryen.ExpressionRef[] {
+        return [module.call(this.readerName(), [], binaryen.none)]
+    }
+
+    write(module: binaryen.Module): binaryen.ExpressionRef[] {
+        return [module.call(this.writerName(), [], binaryen.none)]
+    }
+
+    exports(): Record<string, string> {
+        return this.isPublic ? 
+            { 
+                [this.readerName()]: this.readerName(),
+                [this.writerName()]: this.writerName(),
+            } : {
+            }
+    }
+
+    subExpressions(): Expression[] {
+        return [this.value]
+    }
+
+    at(index: Value<Int32Array>): Value<A> {
+        return new DelayValue(this, index)
+    }
+
+    clear(memory: WebAssembly.Memory) {
+        this.type.flatView(memory.buffer, this.delayBufferRef, this.length * this.type.size).fill(0)
+    }
+
+}
+
+class DelayValue<A extends types.NumberArray> extends Value<A> {
+
+    constructor(readonly indexedDelay: Delay<A>, readonly index: Value<Int32Array>) {
+        super(indexedDelay.type)
+    }
+
+    subExpressions(): Expression[] {
+        return [this.indexedDelay, this.index]
+    }
+
+    calculate(): number[] | null {
+        return null
+    }
+
+    vectorExpression(module: binaryen.Module, variables: FunctionLocals): binaryen.ExpressionRef {
+        return this.indexedDelay.length > 1 ? 
+            module.call("item_ref", [
+                module.i32.const(this.indexedDelay.delayReference), 
+                this.index.expression(module, variables)
+            ], binaryen.i32) :
+            module.i32.const(this.indexedDelay.delayBufferReference)
+    }
+
+    primitiveExpression(component: number, module: binaryen.Module, variables: FunctionLocals): number {
+        const [dataType, insType] = this.typeInfo(module)
+        return insType.load(this.type.componentType.sizeInBytes * component, 0, this.vectorExpression(module, variables)) 
+    }
 
 }
 
