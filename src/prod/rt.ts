@@ -231,7 +231,7 @@ export function addDelayImportsToModule(module: binaryen.Module) {
     module.addFunctionImport("rotate", "delay", "rotate", binaryen.createType([binaryen.i32]), binaryen.i32)
 }
 
-function modules(){
+function modules() {
     return {
         mem: wa.module<MemExports>("mem.wasm"),
         space: wa.module<SpaceExports>("space.wasm"),
@@ -241,10 +241,10 @@ function modules(){
 
 export type RuntimeModules = ReturnType<typeof modules>
 
-export async function initWaModulesWeb(waPath: string) {
+export async function initWaModulesWeb(waPath: string): Promise<RuntimeModules> {
     return wa.loadWeb(waPath, modules(), "mem", "space", "delay");
 }
 
-export function initWaModulesFS(waPath: string) {
+export function initWaModulesFS(waPath: string): RuntimeModules {
     return wa.loadFS(waPath, modules(), "mem", "space", "delay");
 }

@@ -21,6 +21,8 @@ export function newDelayName(): string {
 
 export type BinaryenInstructionType = binaryen.Module["i32"] | binaryen.Module["f64"]
 
+export type ValueExports = Record<string, (ref?: number) => number>
+
 export interface Expression {
 
     subExpressions(): Expression[]
@@ -47,8 +49,8 @@ export abstract class Value<A extends types.NumberArray> implements Expression {
 
     abstract subExpressions(): Expression[]
 
-    named(name: string | null = null): Value<A> {
-        return new NamedValue(this, name)
+    named(name: string | null = null, isTestValue: boolean = false): NamedValue<A> {
+        return new NamedValue(this, name, isTestValue)
     }
     
     delay(length: number): Delay<A> {
@@ -76,22 +78,22 @@ export abstract class Value<A extends types.NumberArray> implements Expression {
     }
 
     vectorExpression(module: binaryen.Module, variables: FunctionLocals): binaryen.ExpressionRef {
-        const resultRef = variables.declare(binaryen.i32) 
-        return this.block(module, [
-            resultRef.set(this.allocateResultSpace(module)),
-            ...this.vectorSubExpressions(module, resultRef, variables),
-            resultRef.get()
-        ])
+        return this.vectorAssignment(module, variables, this.allocateResultSpace(module))
     }
 
-    vectorSubExpressions(module: binaryen.Module, resultRef: FunctionLocal, variables: FunctionLocals): binaryen.ExpressionRef[] {
+    vectorAssignment(module: binaryen.Module, variables: FunctionLocals, resultRef: binaryen.ExpressionRef): binaryen.ExpressionRef {
         const [dataType, insType] = this.typeInfo(module)
-        return [...this.components(i => 
-            insType.store(i * this.type.componentType.sizeInBytes, 0,
-                resultRef.get(),
-                this.primitiveExpression(i, module, variables)
-            )
-        )]
+        const resultRefVar = variables.declare(binaryen.i32)
+        return this.block(module, [
+            resultRefVar.set(resultRef),
+            ...this.components(i => 
+                insType.store(i * this.type.componentType.sizeInBytes, 0,
+                    resultRefVar.get(),
+                    this.primitiveExpression(i, module, variables)
+                )
+            ),
+            resultRefVar.get()
+        ])
     }
 
     abstract primitiveExpression(component: number, module: binaryen.Module, variables: FunctionLocals): binaryen.ExpressionRef
@@ -137,15 +139,15 @@ export abstract class Value<A extends types.NumberArray> implements Expression {
     
 }
 
-export class NamedValue<A extends types.NumberArray, S extends number> extends Value<A> {
+export class NamedValue<A extends types.NumberArray> extends Value<A> {
     
     private readonly name: string 
     private readonly isPublic: boolean 
 
-    constructor(private wrapped: Value<A>, name: string | null) {
+    constructor(private wrapped: Value<A>, name: string | null, private isTestValue: boolean = false) {
         super(wrapped.type)
         this.name = name ? name : newValueName()
-        this.isPublic = name != null
+        this.isPublic = name != null && !isTestValue
     }
 
     subExpressions(): Expression[] {
@@ -157,15 +159,53 @@ export class NamedValue<A extends types.NumberArray, S extends number> extends V
     }
 
     exports(): Record<string, string> {
-        return this.isPublic ? { 
-            [this.name] : this.type.size > 1 ? 
-                this.vectorName() : 
-                this.primitiveName(0) 
-        } : {}
+        return this.isPublic ? 
+            this.publicExports() : 
+            this.isTestValue ? 
+                this.testExports() : 
+                {}
+    }
+
+    private publicExports(): Record<string, string> {
+        return {
+            [this.name]: this.type.size > 1 ?
+                this.vectorName() :
+                this.primitiveName(0)
+        }
+    }
+
+    private testExports(): Record<string, string> {
+        const result: Record<string, string> = this.publicExports()
+        result[this.vectorName()] = this.vectorName()
+        result[this.vectorAssignmentName()] = this.vectorAssignmentName()
+        for (let i = 0; i < this.type.size; i++) {
+            result[this.primitiveName(i)] = this.primitiveName(i)
+        }
+        return result;
+    }
+
+    evaluate(exports: ValueExports): number {
+        return exports[this.name]()
+    }
+
+    evaluateVector(exports: ValueExports): number {
+        return exports[this.vectorName()]()
+    }
+
+    evaluateComponent(exports: ValueExports, component: number): number {
+        return exports[this.primitiveName(component)]()
+    }
+
+    assignVector(exports: ValueExports, ref: number): number {
+        return exports[this.vectorAssignmentName()](ref)
     }
 
     vectorExpression(module: binaryen.Module, variables: FunctionLocals): binaryen.ExpressionRef {
         return module.call(this.vectorName(), [], binaryen.i32)
+    }
+
+    vectorAssignment(module: binaryen.Module, variables: FunctionLocals, resultRef: binaryen.ExpressionRef): binaryen.ExpressionRef {
+        return module.call(this.vectorAssignmentName(), [resultRef], binaryen.i32)
     }
 
     primitiveExpression(component: number, module: binaryen.Module, variables: FunctionLocals): number {
@@ -179,6 +219,9 @@ export class NamedValue<A extends types.NumberArray, S extends number> extends V
             addFunction(module, this.vectorName(), [], binaryen.i32, (params, variables) => 
                 this.wrapped.vectorExpression(module, variables)
             ),
+            addFunction(module, this.vectorAssignmentName(), [binaryen.i32], binaryen.i32, (params, variables) => 
+                this.wrapped.vectorAssignment(module, variables, module.local.get(0, binaryen.i32))
+            ),
             ...this.components(i => 
                 addFunction(module, this.primitiveName(i), [], dataType, (params, variables) => 
                     this.wrapped.primitiveExpression(i, module, variables)
@@ -189,6 +232,10 @@ export class NamedValue<A extends types.NumberArray, S extends number> extends V
     
     private vectorName(): string {
         return `${this.name}_v`
+    }
+
+    private vectorAssignmentName(): string {
+        return `${this.name}_r`
     }
 
     private primitiveName(component: number): string {

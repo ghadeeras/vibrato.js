@@ -23,22 +23,24 @@ abstract class Reduction<A extends types.NumberArray, B extends types.NumberArra
         }, this.accumulator.get())
     }
 
-    vectorSubExpressions(module: binaryen.Module, resultRef: exps.FunctionLocal, variables: exps.FunctionLocals): binaryen.ExpressionRef[] {
-        return [module.drop(
+    vectorAssignment(module: binaryen.Module, variables: exps.FunctionLocals, resultRef: binaryen.ExpressionRef): binaryen.ExpressionRef {
+        const resultRefVar = variables.declare(binaryen.i32) 
+        return this.block(module, [
+            resultRefVar.set(resultRef),
             this.operands.reduce((acc, operand) => {
                 return this.block(module, [
                     module.call("enter", [], binaryen.none),
-                    module.call("return_i32", [this.applicationFunction(module, acc, operand, resultRef, variables)], binaryen.i32)
+                    module.call("return_i32", [this.applicationFunction(module, variables, acc, operand, resultRefVar.get())], binaryen.i32)
                 ])
-            }, this.accumulator.vectorExpression(module, variables))
-        )]
+            }, this.accumulator.vectorAssignment(module, variables, resultRefVar.get()))
+        ])
     }
 
-    private applicationFunction(module: binaryen.Module, acc: number, operand: exps.Value<B>, resultRef: exps.FunctionLocal, variables: exps.FunctionLocals): number {
+    private applicationFunction(module: binaryen.Module, variables: exps.FunctionLocals, acc: number, operand: exps.Value<B>, resultRef: binaryen.ExpressionRef): number {
         const operandValue = operand.type.size > 1 || operand.type.size == this.type.size ?
             operand.vectorExpression(module, variables) :
             operand.primitiveExpression(0, module, variables)
-        const result = resultRef.get()
+        const result = resultRef
         switch (this.type.size) {
             case 2: return module.call(`f64_vec2_${this.name}_r`, [acc, operandValue, result], binaryen.i32) 
             case 3: return module.call(`f64_vec3_${this.name}_r`, [acc, operandValue, result], binaryen.i32)

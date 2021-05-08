@@ -81,8 +81,6 @@ const assembler = new Assembler([
     v1DotV2ND
 ])
 
-console.log(assembler.textCode)
-
 const rtModules = initWaModulesFS("./out/rt")
 const mem = notNull(rtModules.mem.exports, "Couldn't load Vibrato runtime!")
 const test = assembler.exports<TestExports>(rtModules)

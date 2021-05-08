@@ -30,6 +30,8 @@ export class Assembler {
         this.textCode = module.emitText();
         this.binaryCode = module.emitBinary();
         
+        console.log(this.textCode)
+
         module.dispose();
     }
 
