@@ -21,7 +21,7 @@ export function newDelayName(): string {
 
 export type BinaryenInstructionType = binaryen.Module["i32"] | binaryen.Module["f64"]
 
-export type ValueExports = Record<string, (ref?: number) => number>
+export type ValueExports = Record<string, (...params: number[]) => number>
 
 export interface Expression {
 
@@ -43,8 +43,14 @@ export abstract class Value<A extends types.NumberArray> implements Expression {
 
     private calculated = false
     private cachedValue: number[] | null = null
+    private _parameterTypes: types.Vector<any>[]
 
-    constructor(readonly type: types.Vector<A>) {
+    constructor(readonly type: types.Vector<A>, parameterTypes: types.Vector<any>[]) {
+        this._parameterTypes = [...parameterTypes]
+    }
+
+    get parameterTypes() {
+        return [...this._parameterTypes]
     }
 
     abstract subExpressions(): Expression[]
@@ -71,17 +77,17 @@ export abstract class Value<A extends types.NumberArray> implements Expression {
         return {}
     }
 
-    expression(module: binaryen.Module, variables: FunctionLocals): binaryen.ExpressionRef {
+    expression(module: binaryen.Module, variables: FunctionLocals, parameters: FunctionLocal[]): binaryen.ExpressionRef {
         return this.type.size > 1 ? 
-            this.vectorExpression(module, variables) :
-            this.primitiveExpression(0, module, variables)
+            this.vectorExpression(module, variables, parameters) :
+            this.primitiveExpression(0, module, variables, parameters)
     }
 
-    vectorExpression(module: binaryen.Module, variables: FunctionLocals): binaryen.ExpressionRef {
-        return this.vectorAssignment(module, variables, this.allocateResultSpace(module))
+    vectorExpression(module: binaryen.Module, variables: FunctionLocals, parameters: FunctionLocal[]): binaryen.ExpressionRef {
+        return this.vectorAssignment(module, variables, parameters, this.allocateResultSpace(module))
     }
 
-    vectorAssignment(module: binaryen.Module, variables: FunctionLocals, resultRef: binaryen.ExpressionRef): binaryen.ExpressionRef {
+    vectorAssignment(module: binaryen.Module, variables: FunctionLocals, parameters: FunctionLocal[], resultRef: binaryen.ExpressionRef): binaryen.ExpressionRef {
         const [dataType, insType] = this.typeInfo(module)
         const resultRefVar = variables.declare(binaryen.i32)
         return this.block(module, [
@@ -89,14 +95,14 @@ export abstract class Value<A extends types.NumberArray> implements Expression {
             ...this.components(i => 
                 insType.store(i * this.type.componentType.sizeInBytes, 0,
                     resultRefVar.get(),
-                    this.primitiveExpression(i, module, variables)
+                    this.primitiveExpression(i, module, variables, parameters)
                 )
             ),
             resultRefVar.get()
         ])
     }
 
-    abstract primitiveExpression(component: number, module: binaryen.Module, variables: FunctionLocals): binaryen.ExpressionRef
+    abstract primitiveExpression(component: number, module: binaryen.Module, variables: FunctionLocals, parameters: FunctionLocal[]): binaryen.ExpressionRef
 
     memory(memoryAllocator: StaticMemoryAllocator): void {
     }
@@ -111,6 +117,22 @@ export abstract class Value<A extends types.NumberArray> implements Expression {
 
     write(module: binaryen.Module): binaryen.ExpressionRef[] {
         return []
+    }
+
+    protected checkParameters(parameters: FunctionLocal[]) {
+        if (parameters.length != this._parameterTypes.length) {
+            throw new Error(`Expected ${this._parameterTypes.length} parameters, got ${parameters.length} instead!`)
+        }
+        for (let i = 0; i < parameters.length; i++) {
+            const parameter = parameters[i]
+            const parameterType = this._parameterTypes[i]
+            const [expectedType, expectedTypeName] = parameterType.size > 1 || parameterType.componentType == types.integer ?
+                [binaryen.i32, "integer/reference"] :
+                [binaryen.f64, "real"]
+            if (parameter.type != expectedType) {
+                throw new Error(`Expected ${expectedTypeName} for parameter ${i}, but was not!`)
+            }            
+        }
     }
 
     protected typeInfo(module: binaryen.Module): [binaryen.Type, BinaryenInstructionType] {
@@ -143,11 +165,15 @@ export class NamedValue<A extends types.NumberArray> extends Value<A> {
     
     private readonly name: string 
     private readonly isPublic: boolean 
+    private readonly signature: binaryen.Type[]
 
     constructor(private wrapped: Value<A>, name: string | null, private isTestValue: boolean = false) {
-        super(wrapped.type)
+        super(wrapped.type, wrapped.parameterTypes)
         this.name = name ? name : newValueName()
         this.isPublic = name != null && !isTestValue
+        this.signature = this.parameterTypes.map(parameterType => 
+            parameterType.size > 1 || parameterType.componentType == types.integer ? binaryen.i32 : binaryen.f64
+        )
     }
 
     subExpressions(): Expression[] {
@@ -184,47 +210,47 @@ export class NamedValue<A extends types.NumberArray> extends Value<A> {
         return result;
     }
 
-    evaluate(exports: ValueExports): number {
-        return exports[this.name]()
+    evaluate(exports: ValueExports, parameters: number[] = []): number {
+        return exports[this.name](...parameters)
     }
 
-    evaluateVector(exports: ValueExports): number {
-        return exports[this.vectorName()]()
+    evaluateVector(exports: ValueExports, parameters: number[] = []): number {
+        return exports[this.vectorName()](...parameters)
     }
 
-    evaluateComponent(exports: ValueExports, component: number): number {
-        return exports[this.primitiveName(component)]()
+    evaluateComponent(exports: ValueExports, component: number, parameters: number[] = []): number {
+        return exports[this.primitiveName(component)](...parameters)
     }
 
-    assignVector(exports: ValueExports, ref: number): number {
-        return exports[this.vectorAssignmentName()](ref)
+    assignVector(exports: ValueExports, ref: number, parameters: number[] = []): number {
+        return exports[this.vectorAssignmentName()](ref, ...parameters)
     }
 
-    vectorExpression(module: binaryen.Module, variables: FunctionLocals): binaryen.ExpressionRef {
-        return module.call(this.vectorName(), [], binaryen.i32)
+    vectorExpression(module: binaryen.Module, variables: FunctionLocals, parameters: FunctionLocal[]): binaryen.ExpressionRef {
+        return module.call(this.vectorName(), parameters.map(parameter => parameter.get()), binaryen.i32)
     }
 
-    vectorAssignment(module: binaryen.Module, variables: FunctionLocals, resultRef: binaryen.ExpressionRef): binaryen.ExpressionRef {
-        return module.call(this.vectorAssignmentName(), [resultRef], binaryen.i32)
+    vectorAssignment(module: binaryen.Module, variables: FunctionLocals, parameters: FunctionLocal[], resultRef: binaryen.ExpressionRef): binaryen.ExpressionRef {
+        return module.call(this.vectorAssignmentName(), [resultRef, ...parameters.map(parameter => parameter.get())], binaryen.i32)
     }
 
-    primitiveExpression(component: number, module: binaryen.Module, variables: FunctionLocals): number {
+    primitiveExpression(component: number, module: binaryen.Module, variables: FunctionLocals, parameters: FunctionLocal[]): number {
         const [dataType, insType] = this.typeInfo(module)
-        return module.call(this.primitiveName(component), [], dataType)
+        return module.call(this.primitiveName(component), parameters.map(parameter => parameter.get()), dataType)
     }
 
     functions(module: binaryen.Module): number[] {
         const [dataType, insType] = this.typeInfo(module)
         return [
-            addFunction(module, this.vectorName(), [], binaryen.i32, (params, variables) => 
-                this.wrapped.vectorExpression(module, variables)
+            addFunction(module, this.vectorName(), this.signature, binaryen.i32, (params, variables) => 
+                this.wrapped.vectorExpression(module, variables, params)
             ),
-            addFunction(module, this.vectorAssignmentName(), [binaryen.i32], binaryen.i32, (params, variables) => 
-                this.wrapped.vectorAssignment(module, variables, module.local.get(0, binaryen.i32))
+            addFunction(module, this.vectorAssignmentName(), [binaryen.i32, ...this.signature], binaryen.i32, (params, variables) => 
+                this.wrapped.vectorAssignment(module, variables, params.slice(1), module.local.get(0, binaryen.i32))
             ),
             ...this.components(i => 
-                addFunction(module, this.primitiveName(i), [], dataType, (params, variables) => 
-                    this.wrapped.primitiveExpression(i, module, variables)
+                addFunction(module, this.primitiveName(i), this.signature, dataType, (params, variables) => 
+                    this.wrapped.primitiveExpression(i, module, variables, params)
                 )
             )
         ]
@@ -266,6 +292,9 @@ export class Delay<A extends types.NumberArray> implements Expression {
         this.isPublic = name != null
         if (!type.assignableFrom(this.value.type)) {
             throw new Error("Incompatible types!")
+        }
+        if (this.value.parameterTypes.length > 0) {
+            throw new Error("Parametrized values are not allowed as delay input!")
         }
     }
 
@@ -335,7 +364,7 @@ export class Delay<A extends types.NumberArray> implements Expression {
             module.i32.const(this.delayBufferRef)
         return [
             addFunction(module, this.readerName(), [], binaryen.none, (params, vars) =>
-                insType.store(0, 0, module.i32.const(this.nextValueRef), this.value.expression(module, vars))
+                insType.store(0, 0, module.i32.const(this.nextValueRef), this.value.expression(module, vars, []))
             ),
             addFunction(module, this.writerName(), [], binaryen.none, (params, vars) =>
                 this.type.size > 1 ? 
@@ -379,7 +408,7 @@ export class Delay<A extends types.NumberArray> implements Expression {
 class DelayValue<A extends types.NumberArray> extends Value<A> {
 
     constructor(readonly indexedDelay: Delay<A>, readonly index: Value<Int32Array>) {
-        super(indexedDelay.type)
+        super(indexedDelay.type, [])
     }
 
     subExpressions(): Expression[] {
@@ -394,7 +423,7 @@ class DelayValue<A extends types.NumberArray> extends Value<A> {
         return this.indexedDelay.length > 1 ? 
             module.call("item_ref", [
                 module.i32.const(this.indexedDelay.delayReference), 
-                this.index.expression(module, variables)
+                this.index.expression(module, variables, [])
             ], binaryen.i32) :
             module.i32.const(this.indexedDelay.delayBufferReference)
     }
@@ -414,19 +443,23 @@ export interface StaticMemoryAllocator {
 
 export class FunctionLocals {
 
-    readonly locals: FunctionLocal[] = []
+    private readonly _locals: FunctionLocal[] = []
 
     constructor(readonly module: binaryen.Module) {
     }
 
     declare(type: binaryen.Type): FunctionLocal {
-        const local = new FunctionLocal(this.module, type, this.locals.length)
-        this.locals.push(local)
+        const local = new FunctionLocal(this.module, type, this._locals.length)
+        this._locals.push(local)
         return local
     }
 
+    get locals(): FunctionLocal[] {
+        return [...this._locals]
+    }
+
     get localTypes(): binaryen.Type[] {
-        return this.locals.map(local => local.type)
+        return this._locals.map(local => local.type)
     } 
 
 }

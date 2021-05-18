@@ -9,7 +9,7 @@ export class Literal<A extends types.NumberArray> extends exps.Value<A> {
     private pointer: number | null = null
 
     private constructor(type: types.Vector<A>, value: number[]) {
-        super(type)
+        super(type, [])
         assert(() => `Expected ${type.size} vector components; found ${value.length}`, type.size == value.length)
         this.value = [...value]
     }
@@ -28,13 +28,13 @@ export class Literal<A extends types.NumberArray> extends exps.Value<A> {
         }
     }
 
-    vectorExpression(module: binaryen.Module, variables: exps.FunctionLocals): binaryen.ExpressionRef {
+    vectorExpression(module: binaryen.Module, variables: exps.FunctionLocals, parameters: exps.FunctionLocal[]): binaryen.ExpressionRef {
         return this.pointer != null ?
             module.i32.const(this.pointer) :
-            super.vectorExpression(module, variables)
+            super.vectorExpression(module, variables, parameters)
     }
 
-    primitiveExpression(component: number, module: binaryen.Module, variables: exps.FunctionLocals): binaryen.ExpressionRef {
+    primitiveExpression(component: number, module: binaryen.Module, variables: exps.FunctionLocals, parameters: exps.FunctionLocal[]): binaryen.ExpressionRef {
         const [dataType, insType] = this.typeInfo(module)
         return insType.const(this.value[component])
     }

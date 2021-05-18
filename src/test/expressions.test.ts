@@ -5,6 +5,7 @@ import * as rt from '../prod/rt'
 import * as dt from '../prod/datatypes'
 import * as exps from '../prod/expressions'
 import * as ops from '../prod/values/operations'
+import { Variable } from '../prod/values/variables'
 
 type TestExports = {
     discreteUnitDelay_1: () => number
@@ -84,6 +85,14 @@ describe("expressions", () => {
                 dt.vectorOf(2, dt.real), 
                 () => Literal.complex(1, 2)
             )).to.not.throw()
+        })
+
+        it("rejects parametrized values as input", () => {
+            expect(() => exps.Delay.create(
+                10, 
+                dt.vectorOf(3, dt.real), 
+                () => Variable.vectorOf(3, dt.real)
+            )).to.throw()
         })
 
         it("delays signals", () => {

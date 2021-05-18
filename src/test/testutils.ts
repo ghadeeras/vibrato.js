@@ -16,7 +16,7 @@ export function specificationsOf(description: string, specification: () => void)
     }
 }
 
-export function expectation<A extends NumberArray>(description: string, value: Value<A>, predicate: (v: number[]) => boolean) {
+export function expectation<A extends NumberArray>(description: string, value: Value<A>, parameters: number[], predicate: (v: number[]) => boolean) {
     if (context == null) {
         throw new Error("No context is defined!")
     }
@@ -24,6 +24,7 @@ export function expectation<A extends NumberArray>(description: string, value: V
     context.expectations.push({
         description: description,
         value: value.named(id, true),
+        parameters: parameters,
         predicate: predicate
     })
 }
@@ -40,6 +41,7 @@ let context: SpecContext | null = null
 type Expectation<A extends NumberArray> = {
     description: string
     value: NamedValue<A>
+    parameters: number[]
     predicate: (v: number[]) => boolean
 }
 
@@ -86,17 +88,21 @@ class SpecContext {
             for (let expectation of this.expectations) {
                 it(expectation.description, () => {
                     mem.enter()
-                    const ref1 = expectation.value.evaluateVector(test)
+                    const ref1 = expectation.value.evaluateVector(test, expectation.parameters)
                     const ref2 = mem.allocate64(expectation.value.type.size)
-                    const ref3 = expectation.value.assignVector(test, ref2)
+                    const ref3 = expectation.value.assignVector(test, ref2, expectation.parameters)
                     const actualValue0 = expectation.value.get()
                     const actualValue1 = [...expectation.value.type.view(mem.stack.buffer, ref1)[0]]
                     const actualValue2 = [...expectation.value.type.view(mem.stack.buffer, ref2)[0]]
                     const actualValue3 = []
                     for (let i = 0; i < expectation.value.type.size; i++) {
-                        actualValue3.push(expectation.value.evaluateComponent(test, i))
+                        actualValue3.push(expectation.value.evaluateComponent(test, i, expectation.parameters))
                     }
-                    expect(actualValue0).to.satisfy(expectation.predicate)
+                    if (expectation.parameters.length == 0) {
+                        expect(actualValue0).to.satisfy(expectation.predicate)
+                    } else {
+                        expect(actualValue0).to.be.null
+                    }
                     expect(actualValue1).to.satisfy(expectation.predicate)
                     expect(actualValue2).to.satisfy(expectation.predicate)
                     expect(actualValue3).to.satisfy(expectation.predicate)
