@@ -1,4 +1,4 @@
-#!bash
+#!/usr/bin/bash
 
 echo "Making sure runtime output directory exists ..."
 mkdir -p ./out
