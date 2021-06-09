@@ -1,5 +1,6 @@
 import * as types from '../datatypes'
 import * as exps from '../expressions'
+import * as vars from './variables'
 
 import binaryen from 'binaryen'
 
@@ -73,7 +74,7 @@ abstract class Reduction<A extends types.NumberArray, B extends types.NumberArra
 
     protected abstract preApply(acc: number[], value: number[]): number[]
 
-    protected abstract applicationInstruction(module: binaryen.Module, instructionType: exps.BinaryenInstructionType): (left: number, right: number) => number
+    protected abstract applicationInstruction(module: binaryen.Module, instructionType: types.BinaryenInstructionType): (left: number, right: number) => number
 
 }
 
@@ -98,7 +99,7 @@ export class Add<A extends types.NumberArray> extends Operation<A> {
         return acc.map((a, i) => a + value[i])
     }
 
-    protected applicationInstruction(module: binaryen.Module, instructionType: exps.BinaryenInstructionType): (left: number, right: number) => number {
+    protected applicationInstruction(module: binaryen.Module, instructionType: types.BinaryenInstructionType): (left: number, right: number) => number {
         return instructionType.add
     }
 
@@ -118,7 +119,7 @@ export class Sub<A extends types.NumberArray> extends Operation<A> {
         return acc.map((a, i) => a - value[i])
     }
 
-    protected applicationInstruction(module: binaryen.Module, instructionType: exps.BinaryenInstructionType): (left: number, right: number) => number {
+    protected applicationInstruction(module: binaryen.Module, instructionType: types.BinaryenInstructionType): (left: number, right: number) => number {
         return instructionType.sub
     }
 
@@ -138,7 +139,7 @@ export class Mul<A extends types.NumberArray> extends Operation<A> {
         return acc.map((a, i) => a * value[i])
     }
 
-    protected applicationInstruction(module: binaryen.Module, instructionType: exps.BinaryenInstructionType): (left: number, right: number) => number {
+    protected applicationInstruction(module: binaryen.Module, instructionType: types.BinaryenInstructionType): (left: number, right: number) => number {
         return instructionType.mul
     }
 
@@ -158,7 +159,7 @@ export class Div extends Operation<Float64Array> {
         return acc.map((a, i) => a / value[i])
     }
 
-    protected applicationInstruction(module: binaryen.Module, instructionType: exps.BinaryenInstructionType): (left: number, right: number) => number {
+    protected applicationInstruction(module: binaryen.Module, instructionType: types.BinaryenInstructionType): (left: number, right: number) => number {
         return module.f64.div;
     }
 
@@ -181,7 +182,7 @@ export class ScalarMul<A extends types.NumberArray> extends Reduction<A, A> {
         return acc.map(a => a * value[0])
     }
 
-    protected applicationInstruction(module: binaryen.Module, instructionType: exps.BinaryenInstructionType): (left: number, right: number) => number {
+    protected applicationInstruction(module: binaryen.Module, instructionType: types.BinaryenInstructionType): (left: number, right: number) => number {
         return instructionType.mul
     }
 
@@ -204,7 +205,7 @@ export class ScalarDiv extends Reduction<Float64Array, Float64Array> {
         return acc.map(a => a / value[0])
     }
 
-    protected applicationInstruction(module: binaryen.Module, instructionType: exps.BinaryenInstructionType): (left: number, right: number) => number {
+    protected applicationInstruction(module: binaryen.Module, instructionType: types.BinaryenInstructionType): (left: number, right: number) => number {
         return module.f64.div
     }
 
@@ -260,9 +261,96 @@ export class Dot extends exps.Value<Float64Array> {
 
 }
 
+export class Apply<A extends types.NumberArray> extends exps.Value<A> {
+
+    private parameters: exps.Value<any>[]
+
+    constructor(private value: exps.Value<A>, parameters: (exps.Value<any> | null)[]) {
+        super(value.type, Apply.newParameterTypes(value.parameterTypes, parameters))
+        this.parameters = Apply.newParameters(value.parameterTypes, parameters)
+    }
+
+    private static newParameterTypes(parameterTypes: types.Vector<any>[], parameters: (exps.Value<any> | null)[]): types.Vector<any>[] {
+        const newParameters = this.newParameters(parameterTypes, parameters)
+        const result: types.Vector<any>[] = []
+        for (let parameter of newParameters) {
+            result.push(...parameter.parameterTypes)
+        }
+        return result; 
+    }
+
+    private static newParameters(parameterTypes: types.Vector<any>[], parameters: (exps.Value<any> | null)[]): exps.Value<any>[] {
+        if (parameters.length != parameterTypes.length) {
+            throw new Error(`Expected ${parameterTypes.length} parameters but found ${parameters.length}`)
+        }
+        const result: exps.Value<any>[] = []
+        for (let i = 0; i < parameterTypes.length; i++) {
+            const parameterType = parameterTypes[i]
+            const parameter = parameters[i] ?? new vars.Variable(parameterType)
+            if (!parameterType.assignableFrom(parameter.type)) {
+                throw new Error(`Type mismatch for parameter at index ${i}!`)
+            }
+            result.push(parameter)
+        }
+        return result; 
+    }
+
+    subExpressions(): exps.Expression[] {
+        return [this.value, ...this.parameters
+            .filter(parameter => parameter != null)
+            .map(assertNotNull)
+        ]
+    }
+
+    calculate(): number[] | null {
+        return null
+    }
+
+    vectorExpression(module: binaryen.Module, variables: exps.FunctionLocals, parameters: exps.FunctionLocal[]): number {
+        return this.doApply(module, variables, parameters, this.value.type.binaryenType, 
+            valueParameters => this.value.vectorExpression(module, variables, valueParameters)
+        )
+    }
+
+    vectorAssignment(module: binaryen.Module, variables: exps.FunctionLocals, parameters: exps.FunctionLocal[], resultRef: binaryen.ExpressionRef): number {
+        return this.doApply(module, variables, parameters, this.value.type.binaryenType, 
+            valueParameters => this.value.vectorAssignment(module, variables, valueParameters, resultRef)
+        )
+    }
+
+    primitiveExpression(component: number, module: binaryen.Module, variables: exps.FunctionLocals, parameters: exps.FunctionLocal[]): number {
+        return this.doApply(module, variables, parameters, this.value.type.componentType.binaryenType, 
+            valueParameters => this.value.primitiveExpression(component, module, variables, valueParameters)
+        )
+    }
+
+    private doApply(module: binaryen.Module, variables: exps.FunctionLocals, parameters: exps.FunctionLocal[], type: binaryen.Type, parametersApplier: (parameters: exps.FunctionLocal[]) => binaryen.ExpressionRef): binaryen.ExpressionRef {
+        const remainingParams = [...parameters]
+        const valueParameters: exps.FunctionLocal[] = []
+        const assignments: binaryen.ExpressionRef[] = []
+        for (let parameter of this.parameters) {
+            const parameterParameters = remainingParams.splice(0, parameter.parameterTypes.length)
+            const valueParameter = variables.declare(parameter.type.binaryenType)
+            valueParameters.push(valueParameter)
+            assignments.push(valueParameter.set(parameter.expression(module, variables, parameterParameters)))
+        }
+        return module.block(exps.newBlockName(), [
+            ...assignments,
+            parametersApplier(valueParameters)
+        ], type)
+    }
+    
+}
+
+function assertNotNull(parameter: exps.Value<any> | null) {
+    if (parameter == null) {
+        throw new Error("Could not be null here!")
+    }
+    return parameter
+}
+
 function assert(message: () => string, condition: boolean) {
     if (!condition) {
         throw new Error(message())
     }
 }
-

@@ -20,7 +20,12 @@ export function expectation<A extends NumberArray>(description: string, value: V
     if (context == null) {
         throw new Error("No context is defined!")
     }
-    const id = `${context.id}_${context.expectations.length}`;
+
+    const prefix = value instanceof NamedValue ? 
+        context.id.replace("TST", value.name) : 
+        context.id
+    const id = `${prefix}_${context.expectations.length}`
+    
     context.expectations.push({
         description: description,
         value: value.named(id, true),
@@ -98,10 +103,8 @@ class SpecContext {
                     for (let i = 0; i < expectation.value.type.size; i++) {
                         actualValue3.push(expectation.value.evaluateComponent(test, i, expectation.parameters))
                     }
-                    if (expectation.parameters.length == 0) {
+                    if (actualValue0 != null) {
                         expect(actualValue0).to.satisfy(expectation.predicate)
-                    } else {
-                        expect(actualValue0).to.be.null
                     }
                     expect(actualValue1).to.satisfy(expectation.predicate)
                     expect(actualValue2).to.satisfy(expectation.predicate)

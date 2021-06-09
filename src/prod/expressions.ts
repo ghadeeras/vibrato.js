@@ -19,8 +19,6 @@ export function newDelayName(): string {
     return `_D_${sequenceDelays++}`
 }
 
-export type BinaryenInstructionType = binaryen.Module["i32"] | binaryen.Module["f64"]
-
 export type ValueExports = Record<string, (...params: number[]) => number>
 
 export interface Expression {
@@ -135,10 +133,11 @@ export abstract class Value<A extends types.NumberArray> implements Expression {
         }
     }
 
-    protected typeInfo(module: binaryen.Module): [binaryen.Type, BinaryenInstructionType] {
-        return this.type.componentType == types.integer ?
-            [binaryen.i32, module.i32] :
-            [binaryen.f64, module.f64]
+    protected typeInfo(module: binaryen.Module): [binaryen.Type, types.BinaryenInstructionType] {
+        return [
+            this.type.componentType.binaryenType, 
+            this.type.componentType.instructionType(module)
+        ]
     }
 
     protected allocateResultSpace(module: binaryen.Module): binaryen.ExpressionRef {
@@ -163,9 +162,9 @@ export abstract class Value<A extends types.NumberArray> implements Expression {
 
 export class NamedValue<A extends types.NumberArray> extends Value<A> {
     
-    private readonly name: string 
-    private readonly isPublic: boolean 
-    private readonly signature: binaryen.Type[]
+    readonly name: string 
+    readonly isPublic: boolean 
+    readonly signature: binaryen.Type[]
 
     constructor(private wrapped: Value<A>, name: string | null, private isTestValue: boolean = false) {
         super(wrapped.type, wrapped.parameterTypes)

@@ -91,7 +91,7 @@ describe("expressions", () => {
             expect(() => exps.Delay.create(
                 10, 
                 dt.vectorOf(3, dt.real), 
-                () => Variable.vectorOf(3, dt.real)
+                () => Variable.spreadVectorOf(3, dt.real)
             )).to.throw()
         })
 

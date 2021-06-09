@@ -1,3 +1,5 @@
+import * as binaryen from "binaryen"
+
 export type Case<T, A, B> = T extends A ? B : never
 
 export type NumberArray = Int32Array | Float64Array
@@ -9,6 +11,8 @@ export type PrimitiveSize<A extends NumberArray> =
 export type PrimitiveName<A extends NumberArray> = 
       Case<A, Int32Array, "integer"> 
     | Case<A, Float64Array, "real">
+
+export type BinaryenInstructionType = binaryen.Module["i32"] | binaryen.Module["f64"]
 
 export interface RawView {
 
@@ -24,6 +28,10 @@ export interface Primitive<A extends NumberArray> {
     
     readonly sizeInBytes: PrimitiveSize<A>
 
+    readonly binaryenType: binaryen.Type
+
+    instructionType(module: binaryen.Module): BinaryenInstructionType
+
     view(buffer: ArrayBuffer, byteOffset?: number, length?: number): A
 
     rawView(buffer: ArrayBuffer, byteOffset?: number): RawView
@@ -37,6 +45,10 @@ export interface Vector<A extends NumberArray> {
     readonly size: number
 
     readonly sizeInBytes: number
+
+    readonly binaryenType: binaryen.Type
+
+    instructionType(module: binaryen.Module): BinaryenInstructionType
 
     view(buffer: ArrayBuffer, byteOffset?: number, length?: number): A[]
 
@@ -77,8 +89,14 @@ export class Integer implements Primitive<Int32Array> {
     readonly name = "integer"
 
     readonly sizeInBytes = 4
-    
+
+    readonly binaryenType = binaryen.i32
+
     private constructor() {
+    }
+    
+    instructionType(module: binaryen.Module) {
+        return module.i32
     }
     
     view(buffer: ArrayBuffer, byteOffset: number = 0, length: number = 1): Int32Array {
@@ -102,7 +120,13 @@ export class Real implements Primitive<Float64Array> {
 
     readonly sizeInBytes = 8
     
+    readonly binaryenType = binaryen.f64
+
     private constructor() {
+    }
+    
+    instructionType(module: binaryen.Module) {
+        return module.f64
     }
     
     view(buffer: ArrayBuffer, byteOffset: number = 0, length: number = 1): Float64Array {
@@ -131,6 +155,14 @@ class GenericVector<A extends NumberArray> implements Vector<A> {
         this.sizeInBytes = componentType.sizeInBytes * size
     }
 
+    get binaryenType() {
+        return this.size > 1 ? binaryen.i32 : this.componentType.binaryenType
+    }
+
+    instructionType(module: binaryen.Module) {
+        return this.size > 1 ? module.i32 : this.componentType.instructionType(module)
+    }
+    
     view(buffer: ArrayBuffer, byteOffset: number = 0, length: number = 1): A[] {
         const result: A[] = []
         for (let o = byteOffset; length-- > 0; o += this.componentType.sizeInBytes) {
