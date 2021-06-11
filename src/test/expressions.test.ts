@@ -5,7 +5,7 @@ import * as rt from '../prod/rt'
 import * as dt from '../prod/datatypes'
 import * as exps from '../prod/expressions'
 import * as ops from '../prod/values/operations'
-import { Variable } from '../prod/values/variables'
+import * as utils from './testutils'
 
 type TestExports = {
     discreteUnitDelay_1: () => number
@@ -91,7 +91,7 @@ describe("expressions", () => {
             expect(() => exps.Delay.create(
                 10, 
                 dt.vectorOf(3, dt.real), 
-                () => Variable.spreadVectorOf(3, dt.real)
+                () => exps.Variable.spreadVectorOf(3, dt.real)
             )).to.throw()
         })
 
@@ -115,6 +115,50 @@ describe("expressions", () => {
             }
 
         })
+
+    })
+
+})
+
+utils.specificationsOf("Apply Operation", () => {
+
+    const varVector = exps.Variable.vectorOf(3, dt.real)
+    const varScalar = exps.Variable.scalar()
+    const litVector = Literal.vector(4, 5, 6)
+    const litScalar = Literal.scalar(3)
+    const scaledVector = ops.ScalarMul.of(varVector, varScalar)
+
+    utils.expectation(
+        "Applies primitive and vector parameters", 
+        new exps.Apply(scaledVector, [litVector, litScalar]).named("application"), 
+        [], 
+        utils.deeplyEquals([12, 15, 18])
+    )
+
+    utils.expectation(
+        "Partially applies primitive and vector parameters (first param)", 
+        new exps.Apply(scaledVector, [litVector, null]).named("partialApplication1"), 
+        [3], 
+        utils.deeplyEquals([12, 15, 18])
+    )
+
+    utils.expectation(
+        "Partially applies primitive and vector parameters (last param)", 
+        new exps.Apply(new exps.Apply(scaledVector, [null, litScalar]).named("partialApplication2"), [litVector]), 
+        [], 
+        utils.deeplyEquals([12, 15, 18])
+    )
+
+})
+
+utils.specificationsOf("Variable", () => {
+
+    utils.specificationsOf("vector", () => {
+
+            const v = exps.Variable.spreadVectorOf(3, dt.real)
+            const expectedResult = [3, 5, 7]
+    
+            utils.expectation("Uses parameters as components", v, [3, 5, 7], utils.deeplyEquals([3, 5, 7]))
 
     })
 

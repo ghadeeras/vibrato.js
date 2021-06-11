@@ -275,7 +275,7 @@ export interface Function<I extends Expression, O extends Expression> extends Ex
 
 }
 
-export class Delay<A extends types.NumberArray> implements Expression {
+export class Delay<A extends types.NumberArray> extends Value<A> {
 
     private readonly name: string
     private readonly value: Value<A>
@@ -286,6 +286,7 @@ export class Delay<A extends types.NumberArray> implements Expression {
     private delayBufferRef: rt.Reference = -1
     
     private constructor(name: string | null, readonly length: number, readonly type: types.Vector<A>, value: (d: Delay<A>) => Value<A>) {
+        super(type, [types.discrete])
         this.name = name != null ? name : newDelayName()
         this.value = value(this)
         this.isPublic = name != null
@@ -395,43 +396,207 @@ export class Delay<A extends types.NumberArray> implements Expression {
     }
 
     at(index: Value<Int32Array>): Value<A> {
-        return new DelayValue(this, index)
+        return new Apply(this, [index])
     }
 
     clear(memory: WebAssembly.Memory) {
         this.type.flatView(memory.buffer, this.delayBufferRef, this.length * this.type.size).fill(0)
     }
 
+    calculate(): number[] | null {
+        return null
+    }
+
+    vectorExpression(module: binaryen.Module, variables: FunctionLocals, parameters: FunctionLocal[]): binaryen.ExpressionRef {
+        return this.length > 1 ? 
+            module.call("item_ref", [
+                module.i32.const(this.delayReference), 
+                parameters[0].get()
+            ], binaryen.i32) :
+            module.i32.const(this.delayBufferReference)
+    }
+
+    vectorAssignment(module: binaryen.Module, variables: FunctionLocals, parameters: FunctionLocal[], resultRef: binaryen.ExpressionRef): binaryen.ExpressionRef {
+        const ref = variables.declare(this.type.binaryenType)
+        return this.type.size > 1 ?
+            module.block(newBlockName(), [
+                module.memory.copy(ref.tee(resultRef), this.vectorExpression(module, variables, parameters), module.i32.const(this.type.sizeInBytes)),
+                ref.get()
+            ], this.type.binaryenType) :
+            super.vectorAssignment(module, variables, parameters, resultRef)
+    }
+
+    primitiveExpression(component: number, module: binaryen.Module, variables: FunctionLocals, parameters: FunctionLocal[]): number {
+        const [dataType, insType] = this.typeInfo(module)
+        return insType.load(this.type.componentType.sizeInBytes * component, 0, this.vectorExpression(module, variables, parameters)) 
+    }
+
 }
 
-class DelayValue<A extends types.NumberArray> extends Value<A> {
+export class Apply<A extends types.NumberArray> extends Value<A> {
 
-    constructor(readonly indexedDelay: Delay<A>, readonly index: Value<Int32Array>) {
-        super(indexedDelay.type, [])
+    private parameters: Value<any>[]
+
+    constructor(private value: Value<A>, parameters: (Value<any> | null)[]) {
+        super(value.type, Apply.newParameterTypes(value.parameterTypes, parameters))
+        this.parameters = Apply.newParameters(value.parameterTypes, parameters)
+    }
+
+    private static newParameterTypes(parameterTypes: types.Vector<any>[], parameters: (Value<any> | null)[]): types.Vector<any>[] {
+        const newParameters = this.newParameters(parameterTypes, parameters)
+        const result: types.Vector<any>[] = []
+        for (let parameter of newParameters) {
+            result.push(...parameter.parameterTypes)
+        }
+        return result; 
+    }
+
+    private static newParameters(parameterTypes: types.Vector<any>[], parameters: (Value<any> | null)[]): Value<any>[] {
+        if (parameters.length != parameterTypes.length) {
+            throw new Error(`Expected ${parameterTypes.length} parameters but found ${parameters.length}`)
+        }
+        const result: Value<any>[] = []
+        for (let i = 0; i < parameterTypes.length; i++) {
+            const parameterType = parameterTypes[i]
+            const parameter = parameters[i] ?? new Variable(parameterType)
+            if (!parameterType.assignableFrom(parameter.type)) {
+                throw new Error(`Type mismatch for parameter at index ${i}!`)
+            }
+            result.push(parameter)
+        }
+        return result; 
     }
 
     subExpressions(): Expression[] {
-        return [this.indexedDelay, this.index]
+        return [this.value, ...this.parameters
+            .filter(parameter => parameter != null)
+            .map(assertNotNull)
+        ]
     }
 
     calculate(): number[] | null {
         return null
     }
 
-    vectorExpression(module: binaryen.Module, variables: FunctionLocals): binaryen.ExpressionRef {
-        return this.indexedDelay.length > 1 ? 
-            module.call("item_ref", [
-                module.i32.const(this.indexedDelay.delayReference), 
-                this.index.expression(module, variables, [])
-            ], binaryen.i32) :
-            module.i32.const(this.indexedDelay.delayBufferReference)
+    vectorExpression(module: binaryen.Module, variables: FunctionLocals, parameters: FunctionLocal[]): number {
+        return this.doApply(module, variables, parameters, binaryen.i32, 
+            valueParameters => this.value.vectorExpression(module, variables, valueParameters)
+        )
     }
 
-    primitiveExpression(component: number, module: binaryen.Module, variables: FunctionLocals): number {
-        const [dataType, insType] = this.typeInfo(module)
-        return insType.load(this.type.componentType.sizeInBytes * component, 0, this.vectorExpression(module, variables)) 
+    vectorAssignment(module: binaryen.Module, variables: FunctionLocals, parameters: FunctionLocal[], resultRef: binaryen.ExpressionRef): number {
+        return this.doApply(module, variables, parameters, binaryen.i32, 
+            valueParameters => this.value.vectorAssignment(module, variables, valueParameters, resultRef)
+        )
     }
 
+    primitiveExpression(component: number, module: binaryen.Module, variables: FunctionLocals, parameters: FunctionLocal[]): number {
+        return this.doApply(module, variables, parameters, this.value.type.componentType.binaryenType, 
+            valueParameters => this.value.primitiveExpression(component, module, variables, valueParameters)
+        )
+    }
+
+    private doApply(module: binaryen.Module, variables: FunctionLocals, parameters: FunctionLocal[], type: binaryen.Type, parametersApplier: (parameters: FunctionLocal[]) => binaryen.ExpressionRef): binaryen.ExpressionRef {
+        const remainingParams = [...parameters]
+        const valueParameters: FunctionLocal[] = []
+        const assignments: binaryen.ExpressionRef[] = []
+        for (let parameter of this.parameters) {
+            const parameterParameters = remainingParams.splice(0, parameter.parameterTypes.length)
+            const valueParameter = variables.declare(parameter.type.binaryenType)
+            valueParameters.push(valueParameter)
+            assignments.push(valueParameter.set(parameter.expression(module, variables, parameterParameters)))
+        }
+        return module.block(newBlockName(), [
+            ...assignments,
+            parametersApplier(valueParameters)
+        ], type)
+    }
+    
+}
+
+export class Variable<A extends types.NumberArray> extends Value<A> {
+
+    constructor(type: types.Vector<A>, spread: boolean = false) {
+        super(type, Variable.parameterTypes(type, spread))
+    }
+
+    private static parameterTypes<A extends types.NumberArray>(type: types.Vector<A>, spread: boolean) {
+        if (spread && type.size > 1) {
+            const parameterTypes = new Array<types.Vector<any>>(type.size)
+            const parameterType = type.componentType == types.real ? types.scalar : types.discrete
+            parameterTypes.fill(parameterType)
+            return parameterTypes
+        } else {
+            return [type]
+        }
+    }
+
+    private get isRef() {
+        return this.type.size > 1 && this.parameterTypes.length == 1 
+    }
+
+    subExpressions(): Expression[] {
+        return []
+    }
+    
+    calculate(): null {
+        return null;
+    }
+
+    vectorExpression(module: binaryen.Module, variables: FunctionLocals, parameters: FunctionLocal[]): binaryen.ExpressionRef {
+        return this.isRef ?
+            parameters[0].get() :
+            super.vectorExpression(module, variables, parameters)
+    }
+
+    vectorAssignment(module: binaryen.Module, variables: FunctionLocals, parameters: FunctionLocal[], resultRef: binaryen.ExpressionRef): binaryen.ExpressionRef {
+        const ref = variables.declare(this.type.binaryenType)
+        return this.isRef ?
+            module.block(newBlockName(), [
+                module.memory.copy(ref.tee(resultRef), parameters[0].get(), module.i32.const(this.type.sizeInBytes)),
+                ref.get()
+            ], this.type.binaryenType) :
+            super.vectorAssignment(module, variables, parameters, resultRef)
+    }
+
+    primitiveExpression(component: number, module: binaryen.Module, variables: FunctionLocals, parameters: FunctionLocal[]): binaryen.ExpressionRef {
+        const [dataType, insType] = this.typeInfo(module)        
+        return this.isRef ?
+            insType.load(component * this.type.componentType.sizeInBytes, 0, parameters[0].get()) : 
+            parameters[component].get()
+    }
+
+    static discrete() {
+        return new Variable(types.discrete)
+    }
+    
+    static scalar() {
+        return new Variable(types.scalar)
+    }
+    
+    static complex() {
+        return new Variable(types.complex, false)
+    }
+    
+    static spreadComplex() {
+        return new Variable(types.complex, true)
+    }
+    
+    static vectorOf<A extends types.NumberArray>(size: number, type: types.Primitive<A>) {
+        return new Variable(types.vectorOf(size, type), false)
+    }
+    
+    static spreadVectorOf<A extends types.NumberArray>(size: number, type: types.Primitive<A>) {
+        return new Variable(types.vectorOf(size, type), true)
+    }
+    
+}
+
+function assertNotNull(parameter: Value<any> | null) {
+    if (parameter == null) {
+        throw new Error("Could not be null here!")
+    }
+    return parameter
 }
 
 export interface StaticMemoryAllocator {

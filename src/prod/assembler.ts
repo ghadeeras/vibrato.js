@@ -14,25 +14,29 @@ export class Assembler {
     
     constructor(expressions: exps.Expression[]) {
         const allExpressions: exps.Expression[] = flatten(expressions)
-
         const module = this.newModule();
-
-        const stackOffset = this.organizeMemory(module, allExpressions);
-        this.declareStartFunction(module, stackOffset);
-        this.declareCycleFunction(module, allExpressions);
-        this.declareExpressionFunctions(module, allExpressions);
-
-        this.validate(module);
-        this.nonOptimizedTextCode = module.emitText()
-        this.nonOptimizedBinaryCode = module.emitBinary();
-
-        module.optimize();
-        this.textCode = module.emitText();
-        this.binaryCode = module.emitBinary();
-        
-        console.log(this.textCode)
-
-        module.dispose();
+        try {
+            const stackOffset = this.organizeMemory(module, allExpressions);
+            this.declareStartFunction(module, stackOffset);
+            this.declareCycleFunction(module, allExpressions);
+            this.declareExpressionFunctions(module, allExpressions);
+    
+            this.validate(module);
+            this.nonOptimizedTextCode = module.emitText()
+            this.nonOptimizedBinaryCode = module.emitBinary();
+    
+            module.optimize();
+            this.textCode = module.emitText();
+            this.binaryCode = module.emitBinary();
+            
+            console.log(`Final code: \n${this.textCode}`)
+        } catch (e) {
+            console.log(e)
+            console.log(`Bad code: \n${module.emitText()}`)
+            throw e
+        } finally {
+            module.dispose();
+        }
     }
 
     private newModule() {

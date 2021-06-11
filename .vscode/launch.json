@@ -11,7 +11,7 @@
                 "--require", "esm",
                 "--timeout", "120000000",
                 // "--fgrep", ">>>",
-                "${workspaceFolder}/out/test/**/*.test.js",
+                "\"${workspaceFolder}/out/test/**/*.test.js\"",
             ],
             "console": "integratedTerminal",
             "preLaunchTask": "tsc: build"
