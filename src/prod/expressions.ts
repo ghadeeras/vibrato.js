@@ -41,9 +41,9 @@ export abstract class Value<A extends types.NumberArray> implements Expression {
 
     private calculated = false
     private cachedValue: number[] | null = null
-    private _parameterTypes: types.Vector<any>[]
+    private _parameterTypes: types.DataType<any>[]
 
-    constructor(readonly type: types.Vector<A>, parameterTypes: types.Vector<any>[]) {
+    constructor(readonly type: types.DataType<A>, parameterTypes: types.DataType<any>[]) {
         this._parameterTypes = [...parameterTypes]
     }
 
@@ -285,7 +285,7 @@ export class Delay<A extends types.NumberArray> extends Value<A> {
     private delayRef: rt.Reference = -1
     private delayBufferRef: rt.Reference = -1
     
-    private constructor(name: string | null, readonly length: number, readonly type: types.Vector<A>, value: (d: Delay<A>) => Value<A>) {
+    private constructor(name: string | null, readonly length: number, readonly type: types.DataType<A>, value: (d: Delay<A>) => Value<A>) {
         super(type, [types.discrete])
         this.name = name != null ? name : newDelayName()
         this.value = value(this)
@@ -298,11 +298,11 @@ export class Delay<A extends types.NumberArray> extends Value<A> {
         }
     }
 
-    static create<A extends types.NumberArray>(length: number, type: types.Vector<A>, value: (d: Delay<A>) => Value<A>) {
+    static create<A extends types.NumberArray>(length: number, type: types.DataType<A>, value: (d: Delay<A>) => Value<A>) {
         return new Delay(null, length, type, value)
     }
 
-    static createNamed<A extends types.NumberArray>(name: string, length: number, type: types.Vector<A>, value: (d: Delay<A>) => Value<A>) {
+    static createNamed<A extends types.NumberArray>(name: string, length: number, type: types.DataType<A>, value: (d: Delay<A>) => Value<A>) {
         return new Delay(name, length, type, value)
     }
 
@@ -442,16 +442,16 @@ export class Apply<A extends types.NumberArray> extends Value<A> {
         this.parameters = Apply.newParameters(value.parameterTypes, parameters)
     }
 
-    private static newParameterTypes(parameterTypes: types.Vector<any>[], parameters: (Value<any> | null)[]): types.Vector<any>[] {
+    private static newParameterTypes(parameterTypes: types.DataType<any>[], parameters: (Value<any> | null)[]): types.DataType<any>[] {
         const newParameters = this.newParameters(parameterTypes, parameters)
-        const result: types.Vector<any>[] = []
+        const result: types.DataType<any>[] = []
         for (let parameter of newParameters) {
             result.push(...parameter.parameterTypes)
         }
         return result; 
     }
 
-    private static newParameters(parameterTypes: types.Vector<any>[], parameters: (Value<any> | null)[]): Value<any>[] {
+    private static newParameters(parameterTypes: types.DataType<any>[], parameters: (Value<any> | null)[]): Value<any>[] {
         if (parameters.length != parameterTypes.length) {
             throw new Error(`Expected ${parameterTypes.length} parameters but found ${parameters.length}`)
         }
@@ -516,13 +516,13 @@ export class Apply<A extends types.NumberArray> extends Value<A> {
 
 export class Variable<A extends types.NumberArray> extends Value<A> {
 
-    constructor(type: types.Vector<A>, spread: boolean = false) {
+    constructor(type: types.DataType<A>, spread: boolean = false) {
         super(type, Variable.parameterTypes(type, spread))
     }
 
-    private static parameterTypes<A extends types.NumberArray>(type: types.Vector<A>, spread: boolean) {
+    private static parameterTypes<A extends types.NumberArray>(type: types.DataType<A>, spread: boolean) {
         if (spread && type.size > 1) {
-            const parameterTypes = new Array<types.Vector<any>>(type.size)
+            const parameterTypes = new Array<types.DataType<any>>(type.size)
             const parameterType = type.componentType == types.real ? types.scalar : types.discrete
             parameterTypes.fill(parameterType)
             return parameterTypes
@@ -601,7 +601,7 @@ function assertNotNull(parameter: Value<any> | null) {
 
 export interface StaticMemoryAllocator {
 
-    declare<A extends types.NumberArray>(vector: types.Vector<A>, initialValue: number[]): number
+    declare<A extends types.NumberArray>(dataType: types.DataType<A>, initialValue: number[]): number
 
 }
 

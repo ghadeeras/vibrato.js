@@ -38,7 +38,7 @@ export interface Primitive<A extends NumberArray> {
 
 }
 
-export interface Vector<A extends NumberArray> {
+export interface DataType<A extends NumberArray> {
 
     readonly componentType: Primitive<A>
     
@@ -56,7 +56,22 @@ export interface Vector<A extends NumberArray> {
 
     buffer(array: number[]): ArrayBuffer
 
-    assignableFrom<V extends Vector<A>>(vector: V): boolean
+    assignableFrom<T extends DataType<A>>(dataType: T): boolean
+
+    asVector(): Vector<A>
+
+    asArray(): DataArray<A, any>
+
+}
+
+export interface Vector<A extends NumberArray> extends DataType<A> {
+}
+
+export interface DataArray<A extends NumberArray, T extends DataType<A>> extends DataType<A> {
+
+    readonly itemType: T
+
+    readonly length: number
 
 }
 
@@ -147,17 +162,18 @@ export class Real implements Primitive<Float64Array> {
 export const integer = Integer.type
 export const real = Real.type
 
-class GenericVector<A extends NumberArray> implements Vector<A> {
+abstract class GenericDataType<A extends NumberArray> implements DataType<A> {
     
     readonly sizeInBytes: number
+    readonly binaryenType: binaryen.Type
 
     constructor(readonly componentType: Primitive<A>, readonly size: number) {
         this.sizeInBytes = componentType.sizeInBytes * size
+        this.binaryenType = size > 1 ? binaryen.i32 : componentType.binaryenType 
     }
 
-    get binaryenType() {
-        return this.size > 1 ? binaryen.i32 : this.componentType.binaryenType
-    }
+    abstract asVector(): Vector<A>
+    abstract asArray(): DataArray<A, any>
 
     instructionType(module: binaryen.Module) {
         return this.size > 1 ? module.i32 : this.componentType.instructionType(module)
@@ -187,8 +203,40 @@ class GenericVector<A extends NumberArray> implements Vector<A> {
         return result
     }
 
-    assignableFrom<V extends Vector<A>>(vector: V): boolean {
-        return vector instanceof this.constructor && vector.size == this.size && vector.componentType === this.componentType
+    assignableFrom<T extends DataType<A>>(dataType: T): boolean {
+        return dataType instanceof this.constructor && dataType.size == this.size && dataType.componentType === this.componentType
+    }
+
+}
+
+class GenericVector<A extends NumberArray> extends GenericDataType<A> {
+
+    constructor(componentType: Primitive<A>, size: number) {
+        super(componentType, size)
+    }
+
+    asVector(): Vector<A> {
+        return this
+    }
+
+    asArray(): DataArray<A, any> {
+        throw new Error("Expected an array, but found a vector instead.")
+    }
+    
+}
+
+class GenericArray<A extends NumberArray, T extends DataType<A>> extends GenericDataType<A> implements DataArray<A, T> {
+
+    constructor(readonly itemType: T, readonly length: number) {
+        super(itemType.componentType, itemType.size * length)
+    }
+
+    asVector(): Vector<A> {
+        throw new Error("Expected a vector, but found an array instead.")
+    }
+
+    asArray(): DataArray<A, any> {
+        return this
     }
 
 }
@@ -197,7 +245,17 @@ export function vectorOf<A extends NumberArray>(size: number, primitiveType: Pri
     return new GenericVector(primitiveType, size)
 }
 
+export function arrayOf<A extends NumberArray, T extends DataType<A>>(length: number, itemType: T) {
+    return new GenericArray(itemType, length)
+}
+
 export class Discrete extends GenericVector<Int32Array> {
+    asVector(): Vector<Int32Array> {
+        throw new Error("Method not implemented.")
+    }
+    asArray(): DataArray<Int32Array, any> {
+        throw new Error("Method not implemented.")
+    }
 
     private constructor() {
         super(integer, 1)
@@ -208,6 +266,12 @@ export class Discrete extends GenericVector<Int32Array> {
 }
 
 export class Scalar extends GenericVector<Float64Array> {
+    asVector(): Vector<Float64Array> {
+        throw new Error("Method not implemented.")
+    }
+    asArray(): DataArray<Float64Array, any> {
+        throw new Error("Method not implemented.")
+    }
 
     private constructor() {
         super(real, 1)
@@ -218,6 +282,12 @@ export class Scalar extends GenericVector<Float64Array> {
 }
 
 export class Complex extends GenericVector<Float64Array> {
+    asVector(): Vector<Float64Array> {
+        throw new Error("Method not implemented.")
+    }
+    asArray(): DataArray<Float64Array, any> {
+        throw new Error("Method not implemented.")
+    }
 
     private constructor() {
         super(real, 2)
