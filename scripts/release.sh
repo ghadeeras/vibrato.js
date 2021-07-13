@@ -17,7 +17,7 @@ mv out/README.md . || exit 1
 
 echo "Creating the manifest ..."
 touch manifest
-find rt -type f >> manifest
+find rt -type f > manifest
 find js -type f >> manifest
 [[ -f manifest ]] || exit 1
 
