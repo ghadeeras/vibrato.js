@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { Literal } from '../prod/values/literal'
 import { Assembler } from '../prod/assembler'
-import * as rt from '../prod/rt'
+import * as rt from '../prod/rt-node'
 import * as dt from '../prod/datatypes'
 import * as exps from '../prod/expressions'
 import * as ops from '../prod/values/operations'

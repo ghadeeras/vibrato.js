@@ -1,5 +1,3 @@
-import fs from 'fs'
-
 export type Module<E extends WebAssembly.Exports> = {
     readonly sourceFile: string;
     exports?: E; 
@@ -29,15 +27,6 @@ export async function loadWeb<M extends Modules>(waPath: string, modules: M, fir
         firstModule.exports = instantiate(buffer, modules)
     }
     return rest.length == 0 ? modules : loadWeb(waPath, modules, rest[0], ...rest.slice(1))
-}
-
-export function loadFS<M extends Modules>(waPath: string, modules: M, first: ModuleName<M>, ...rest: ModuleName<M>[]): M {
-    const firstModule = modules[first]
-    if (!firstModule.exports) {
-        const buffer = fs.readFileSync(waPath + "/" + firstModule.sourceFile)
-        firstModule.exports = instantiate(buffer, modules)
-    }
-    return rest.length == 0 ? modules : loadFS(waPath, modules, rest[0], ...rest.slice(1))
 }
 
 function asImports<M extends Modules>(modules: M): WebAssembly.Imports {

@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import { Literal } from '../../prod/values/literal'
 import { Add, ScalarMul, Dot } from '../../prod/values/operations'
 import { Assembler } from '../../prod/assembler'
-import { initWaModulesFS } from '../../prod/rt'
+import { initWaModulesFS } from '../../prod/rt-node'
 import { NumberArray, scalar } from '../../prod/datatypes'
 import { Value } from '../../prod/expressions'
 

@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import * as rt from '../prod/rt'
+import * as rt from '../prod/rt-node'
 import * as dt from '../prod/datatypes'
 
 const rtModules = rt.initWaModulesFS("./out/rt")

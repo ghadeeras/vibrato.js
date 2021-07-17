@@ -1,5 +1,5 @@
-import * as types from '../datatypes'
-import * as exps from '../expressions'
+import * as types from '../datatypes.js'
+import * as exps from '../expressions.js'
 
 import binaryen from 'binaryen'
 

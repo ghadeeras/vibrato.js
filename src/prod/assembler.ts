@@ -1,7 +1,7 @@
-import * as types from './datatypes' 
-import * as exps from './expressions'
-import * as wa from './wa';
-import * as rt from './rt';
+import * as types from './datatypes.js'
+import * as exps from './expressions.js'
+import * as wa from './wa.js'
+import * as rt from './rt-node.js'
 
 import binaryen from 'binaryen'
 

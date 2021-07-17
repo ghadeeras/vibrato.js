@@ -2,7 +2,7 @@ import { expect } from "chai";
 import { Assembler } from "../prod/assembler";
 import { NumberArray } from "../prod/datatypes";
 import { Value, ValueExports, NamedValue } from "../prod/expressions"
-import * as rt from "../prod/rt";
+import * as rt from "../prod/rt-node";
 
 export function specificationsOf(description: string, specification: () => void) {
     context = new SpecContext(description, context)

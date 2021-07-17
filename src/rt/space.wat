@@ -4,6 +4,48 @@
 
     (import "mem" "allocate64" (func $allocate64 (param $size i32) (result i32)))
 
+    ;; ##### Init #####
+
+    (func $f64_vec2 (param $x f64) (param $y f64) (result i32)
+        (call $f64_vec2_r (local.get $x) (local.get $y) (call $allocate64 (i32.const 2)))
+    )
+
+    (func $f64_vec2_r (param $x f64) (param $y f64) (param $result i32) (result i32)
+        (f64.store offset=0 (local.get $result) (local.get $x))
+        (f64.store offset=8 (local.get $result) (local.get $y))
+        (local.get $result)
+    )
+        
+    (func $f64_vec3 (param $x f64) (param $y f64) (param $z f64) (result i32)
+        (call $f64_vec3_r (local.get $x) (local.get $y) (local.get $z) (call $allocate64 (i32.const 3)))
+    )
+
+    (func $f64_vec3_r (param $x f64) (param $y f64) (param $z f64) (param $result i32) (result i32)
+        (f64.store offset=0 (local.get $result) (local.get $x))
+        (f64.store offset=8 (local.get $result) (local.get $y))
+        (f64.store offset=16 (local.get $result) (local.get $z))
+        (local.get $result)
+    )
+        
+    (func $f64_vec4 (param $x f64) (param $y f64) (param $z f64) (param $w f64) (result i32)
+        (call $f64_vec4_r (local.get $x) (local.get $y) (local.get $z) (local.get $w) (call $allocate64 (i32.const 4)))
+    )
+
+    (func $f64_vec4_r (param $x f64) (param $y f64) (param $z f64) (param $w f64) (param $result i32) (result i32)
+        (f64.store offset=0 (local.get $result) (local.get $x))
+        (f64.store offset=8 (local.get $result) (local.get $y))
+        (f64.store offset=16 (local.get $result) (local.get $z))
+        (f64.store offset=24 (local.get $result) (local.get $w))
+        (local.get $result)
+    )
+        
+    (export "f64_vec2" (func $f64_vec2))
+    (export "f64_vec2_r" (func $f64_vec2_r))
+    (export "f64_vec3" (func $f64_vec3))
+    (export "f64_vec3_r" (func $f64_vec3_r))
+    (export "f64_vec4" (func $f64_vec4))
+    (export "f64_vec4_r" (func $f64_vec4_r))
+
     ;; ##### Addition ##### 
 
     (func $f64_vec2_add (param $v1 i32) (param $v2 i32) (result i32)

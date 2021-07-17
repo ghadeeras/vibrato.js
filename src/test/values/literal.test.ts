@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { Literal } from '../../prod/values/literal'
 import { Assembler } from '../../prod/assembler'
-import { initWaModulesFS } from '../../prod/rt'
+import { initWaModulesFS } from '../../prod/rt-node'
 import * as types from '../../prod/datatypes'
 
 type TestExports = {
