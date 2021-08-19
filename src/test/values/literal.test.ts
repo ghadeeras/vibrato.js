@@ -18,7 +18,7 @@ const assembler = new Assembler([
     Literal.vector(1.2, 2.3, 3.4).named("vector")        
 ])
 
-const rtModules = initWaModulesFS("./out/rt")
+const rtModules = initWaModulesFS("./out/wa")
 const mem = notNull(rtModules.mem.exports, "Couldn't load Vibrato runtime!")
 const test = assembler.exports<TestExports>(rtModules)
 

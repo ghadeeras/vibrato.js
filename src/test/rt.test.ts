@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import * as rt from '../prod/rt-node'
 import * as dt from '../prod/datatypes'
 
-const rtModules = rt.initWaModulesFS("./out/rt")
+const rtModules = rt.initWaModulesFS("./out/wa")
 const mem = notNull(rtModules.mem.exports, "Couldn't load Vibrato runtime 'mem' module !")
 const space = notNull(rtModules.space.exports, "Couldn't load Vibrato runtime 'space' module!")
 const delay = notNull(rtModules.delay.exports, "Couldn't load Vibrato runtime 'delay' module!")

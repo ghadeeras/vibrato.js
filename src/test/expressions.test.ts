@@ -59,7 +59,7 @@ const assembler = new Assembler([
     vectorDelay.at(minus8).named("vectorDelay_8")
 ])
 
-const rtModules = rt.initWaModulesFS("./out/rt")
+const rtModules = rt.initWaModulesFS("./out/wa")
 const mem = notNull(rtModules.mem.exports, "Couldn't load Vibrato runtime!")
 const test = assembler.exports<TestExports>(rtModules)
 

@@ -68,7 +68,7 @@ class SpecContext {
     createTests() {
         const values = this.collectValues()
         const assembler = new Assembler(values)
-        const rtModules = rt.initWaModulesFS("./out/rt")
+        const rtModules = rt.initWaModulesFS("./out/wa")
         const mem = notNull(rtModules.mem.exports, "Couldn't load Vibrato runtime!")
         const test = assembler.exports<ValueExports>(rtModules)
 

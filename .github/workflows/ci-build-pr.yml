@@ -8,10 +8,10 @@ on:
     branches: [ main ]
     paths:
       - 'src/**'
+      - 'scripts/**'
       - 'package.json'
       - 'package-lock.json'
       - 'tsconfig.json'
-      - 'build-rt.sh'
 
 jobs:
   build:
@@ -38,9 +38,7 @@ jobs:
         wabt-version: ${{ matrix.wabt-version }}
 
     - name: Build Runtime WASM Modules
-      run: |
-        chmod +x ./build-rt.sh
-        bash ./build-rt.sh
+      run: bash ./scripts/build-wa.sh
 
     - name: NPM build/test
       run: |

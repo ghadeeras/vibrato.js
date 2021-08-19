@@ -2,12 +2,12 @@
 
 echo "Making sure runtime output directory exists ..."
 mkdir -p ./out
-rm -fR ./out/rt 
-mkdir ./out/rt || exit 1 
+rm -fR ./out/wa 
+mkdir ./out/wa || exit 1 
 
 echo "Building runtime modules ..."
-ls ./src/rt/*.wat \
+ls ./src/wa/*.wat \
     | xargs -I {} basename {} ".wat" \
-    | xargs -I {} wat2wasm --enable-bulk-memory --output=./out/rt/{}.wasm ./src/rt/{}.wat || exit 1
+    | xargs -I {} wat2wasm --enable-bulk-memory --output=./out/wa/{}.wasm ./src/wa/{}.wat || exit 1
 
 echo "Success!"
