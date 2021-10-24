@@ -116,7 +116,10 @@ export type DelayExports = {
 
 }
 
-export function modules() {
+/**
+ * @deprecated
+ */
+ export function modules() {
     return {
         mem: wa.module<MemExports>("mem.wasm"),
         space: wa.module<SpaceExports>("space.wasm"),
@@ -124,8 +127,59 @@ export function modules() {
     }
 } 
 
-export type RuntimeModules = ReturnType<typeof modules>
+/**
+ * @deprecated
+ */
+ export type RuntimeModules = ReturnType<typeof modules>
 
-export async function initWaModulesWeb(waPath: string): Promise<RuntimeModules> {
+/**
+ * @deprecated
+ */
+ export async function initWaModulesWeb(waPath: string): Promise<RuntimeModules> {
     return wa.loadWeb(waPath, modules(), "mem", "space", "delay");
+}
+
+export type RuntimeExports = {
+    mem: MemExports
+    space: SpaceExports
+    delay: DelayExports
+}
+
+export type RuntimeModuleNames = keyof RuntimeExports
+
+export type Runtime = {
+    modules: wa.WebAssemblyModules<RuntimeModuleNames>
+    instances: wa.WebAssemblyInstances<RuntimeModuleNames>
+    exports: RuntimeExports
+}
+
+export function runtimeModulePaths(): Record<RuntimeModuleNames, string> {
+    return {
+        mem: "mem.wasm",
+        space: "space.wasm",
+        delay: "delay.wasm",
+    }
+} 
+
+export async function webRuntime(waPath: string): Promise<Runtime> {
+    const modules = await webLoadRuntimeModules(waPath);
+    return linkRuntime(modules);
+}
+
+export async function webLoadRuntimeModules(waPath: string): Promise<wa.WebAssemblyModules<RuntimeModuleNames>> {
+    return await wa.webLoadModules(waPath, runtimeModulePaths());
+}
+
+export function linkRuntime(modules: wa.WebAssemblyModules<RuntimeModuleNames>): Runtime {
+    const linker = new wa.Linker(modules);
+    const instances = linker.link({});
+    return {
+        modules: modules,
+        instances: instances,
+        exports: {
+            mem: instances.mem.exports,
+            space: instances.space.exports,
+            delay: instances.delay.exports,
+        }
+    };
 }

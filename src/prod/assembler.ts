@@ -102,8 +102,11 @@ export class Assembler {
         }
     }
 
-    exports<E extends WebAssembly.Exports>(rtModules: rt.RuntimeModules): E {
-        return wa.instantiate<E>(this.binaryCode.buffer, rtModules)
+    exports<E extends WebAssembly.Exports>(rt: rt.Runtime): E {
+        const linker = new wa.Linker({
+            generated: new WebAssembly.Module(this.binaryCode.buffer)
+        })
+        return linker.link(rt.instances).generated.exports
     }
 
 }

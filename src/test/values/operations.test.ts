@@ -2,7 +2,7 @@ import { expect } from 'chai'
 import { Literal } from '../../prod/values/literal'
 import { Add, ScalarMul, Dot } from '../../prod/values/operations'
 import { Assembler } from '../../prod/assembler'
-import { initWaModulesFS } from '../../prod/rt-node'
+import { fsRuntime } from '../../prod/rt-node'
 import { NumberArray, scalar } from '../../prod/datatypes'
 import { Value } from '../../prod/expressions'
 
@@ -81,9 +81,9 @@ const assembler = new Assembler([
     v1DotV2ND
 ])
 
-const rtModules = initWaModulesFS("./out/wa")
-const mem = notNull(rtModules.mem.exports, "Couldn't load Vibrato runtime!")
-const test = assembler.exports<TestExports>(rtModules)
+const runtime = fsRuntime("./out/wa")
+const mem = notNull(runtime.exports.mem, "Couldn't load Vibrato runtime!")
+const test = assembler.exports<TestExports>(runtime)
 
 describe("Operations", () => {
 

@@ -1,7 +1,7 @@
 import { expect } from 'chai'
 import { Literal } from '../../prod/values/literal'
 import { Assembler } from '../../prod/assembler'
-import { initWaModulesFS } from '../../prod/rt-node'
+import { fsRuntime } from '../../prod/rt-node'
 import * as types from '../../prod/datatypes'
 
 type TestExports = {
@@ -18,9 +18,9 @@ const assembler = new Assembler([
     Literal.vector(1.2, 2.3, 3.4).named("vector")        
 ])
 
-const rtModules = initWaModulesFS("./out/wa")
-const mem = notNull(rtModules.mem.exports, "Couldn't load Vibrato runtime!")
-const test = assembler.exports<TestExports>(rtModules)
+const runtime = fsRuntime("./out/wa")
+const mem = notNull(runtime.exports.mem, "Couldn't load Vibrato runtime!")
+const test = assembler.exports<TestExports>(runtime)
 
 describe("Literal", () => {
 
