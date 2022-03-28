@@ -1,4 +1,4 @@
-import * as binaryen from "binaryen"
+import binaryen from "binaryen"
 
 export type Case<T, A, B> = T extends A ? B : never
 

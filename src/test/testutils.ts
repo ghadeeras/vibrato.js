@@ -1,8 +1,8 @@
 import { expect } from "chai";
-import { Assembler } from "../prod/assembler";
-import { NumberArray } from "../prod/datatypes";
-import { Value, ValueExports, NamedValue } from "../prod/expressions"
-import * as rt from "../prod/rt-node";
+import { Assembler } from "../prod/assembler.js";
+import { NumberArray } from "../prod/datatypes.js";
+import { Value, ValueExports, NamedValue } from "../prod/expressions.js"
+import * as rt from "../prod/rt-node.js";
 
 export function specificationsOf(description: string, specification: () => void) {
     context = new SpecContext(description, context)

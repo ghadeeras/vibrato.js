@@ -8,6 +8,6 @@ mkdir ./out/wa || exit 1
 echo "Building runtime modules ..."
 ls ./src/wa/*.wat \
     | xargs -I {} basename {} ".wat" \
-    | xargs -I {} wat2wasm --enable-bulk-memory --output=./out/wa/{}.wasm ./src/wa/{}.wat || exit 1
+    | xargs -I {} wat2wasm --output=./out/wa/{}.wasm ./src/wa/{}.wat || exit 1
 
 echo "Success!"

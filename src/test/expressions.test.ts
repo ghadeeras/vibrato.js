@@ -1,11 +1,11 @@
 import { expect } from 'chai'
-import { Literal } from '../prod/values/literal'
-import { Assembler } from '../prod/assembler'
-import * as rt from '../prod/rt-node'
-import * as dt from '../prod/datatypes'
-import * as exps from '../prod/expressions'
-import * as ops from '../prod/values/operations'
-import * as utils from './testutils'
+import { Literal } from '../prod/values/literal.js'
+import { Assembler } from '../prod/assembler.js'
+import * as rt from '../prod/rt-node.js'
+import * as dt from '../prod/datatypes.js'
+import * as exps from '../prod/expressions.js'
+import * as ops from '../prod/values/operations.js'
+import * as utils from './testutils.js'
 
 type TestExports = {
     discreteUnitDelay_1: () => number

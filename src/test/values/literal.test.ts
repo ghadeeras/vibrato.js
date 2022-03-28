@@ -1,8 +1,8 @@
 import { expect } from 'chai'
-import { Literal } from '../../prod/values/literal'
-import { Assembler } from '../../prod/assembler'
-import { fsRuntime } from '../../prod/rt-node'
-import * as types from '../../prod/datatypes'
+import { Literal } from '../../prod/values/literal.js'
+import { Assembler } from '../../prod/assembler.js'
+import { fsRuntime } from '../../prod/rt-node.js'
+import * as types from '../../prod/datatypes.js'
 
 type TestExports = {
     pi: () => number,

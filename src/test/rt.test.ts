@@ -1,6 +1,6 @@
 import { expect } from 'chai'
-import * as rt from '../prod/rt-node'
-import * as dt from '../prod/datatypes'
+import * as rt from '../prod/rt-node.js'
+import * as dt from '../prod/datatypes.js'
 
 const runtime = rt.fsRuntime("./out/wa")
 const mem = notNull(runtime.exports.mem, "Couldn't load Vibrato runtime 'mem' module !")

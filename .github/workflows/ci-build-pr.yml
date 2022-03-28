@@ -20,8 +20,8 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [14.x]
-        wabt-version: [1.0.21]
+        node-version: [16.x]
+        wabt-version: [1.0.27]
 
     steps:
     - name: Checkout source code

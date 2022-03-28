@@ -1,6 +1,6 @@
 (module
 
-    (memory $stack 1)
+    (memory $stack 1 0x10000)
 
     (global $stackTop (mut i32) (i32.const 0))
     (global $localOffset (mut i32) (i32.const 0))

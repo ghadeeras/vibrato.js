@@ -1,5 +1,5 @@
 import { expect } from 'chai'
-import * as types from '../prod/datatypes'
+import * as types from '../prod/datatypes.js'
 
 describe('integer', () => {
 
