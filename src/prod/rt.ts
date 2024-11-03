@@ -116,29 +116,6 @@ export type DelayExports = {
 
 }
 
-/**
- * @deprecated
- */
- export function modules() {
-    return {
-        mem: wa.module<MemExports>("mem.wasm"),
-        space: wa.module<SpaceExports>("space.wasm"),
-        delay: wa.module<DelayExports>("delay.wasm"),
-    }
-} 
-
-/**
- * @deprecated
- */
- export type RuntimeModules = ReturnType<typeof modules>
-
-/**
- * @deprecated
- */
- export async function initWaModulesWeb(waPath: string): Promise<RuntimeModules> {
-    return wa.loadWeb(waPath, modules(), "mem", "space", "delay");
-}
-
 export type RuntimeExports = {
     mem: MemExports
     space: SpaceExports
