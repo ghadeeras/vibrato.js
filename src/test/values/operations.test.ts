@@ -2,7 +2,8 @@ import { expect } from 'chai'
 import { Literal } from '../../prod/values/literal.js'
 import { Add, ScalarMul, Dot } from '../../prod/values/operations.js'
 import { Assembler } from '../../prod/assembler.js'
-import { fsRuntime } from '../../prod/rt-node.js'
+import * as rt from '../../prod/rt.js'
+import * as waNode from '../../prod/wa-node.js'
 import { NumberArray, scalar } from '../../prod/datatypes.js'
 import { Value } from '../../prod/expressions.js'
 
@@ -81,12 +82,12 @@ const assembler = new Assembler([
     v1DotV2ND
 ])
 
-const runtime = fsRuntime("./out/wa")
-const mem = notNull(runtime.exports.mem, "Couldn't load Vibrato runtime!")
-const test = assembler.exports<TestExports>(runtime)
+describe("Operations", async () => {
 
-describe("Operations", () => {
-
+    const runtime = await rt.runtime("./out/wa", waNode.fsModulesLoader, assembler.rawMem)
+    const mem = notNull(runtime.exports.mem, "Couldn't load Vibrato runtime!")
+    const test = assembler.exports<TestExports>(runtime)
+    
     describe("Add", () => {
 
         it("produces value of same type as operands", () => {
@@ -211,27 +212,27 @@ describe("Operations", () => {
 
     })
 
-})
-
-function primitive<T extends NumberArray>(vector: Value<T>) {
-    return component(vector, 0)
-}
-
-function component<T extends NumberArray>(value: Value<T>, index: number) {
-    return vector(value)[index]
-}
-
-function vector<T extends NumberArray>(value: Value<T>) {
-    return notNull(value.get())
-}
-
-function dereference<T extends NumberArray>(value: Value<T>, ref: number) {
-    return value.type.view(mem.stack.buffer, ref)[0]
-}
-
-function notNull<T>(value: T | null | undefined, message: string = "Cannot possibly be null"): T {
-    if (!value) {
-        throw new Error(message)
+    function primitive<T extends NumberArray>(vector: Value<T>) {
+        return component(vector, 0)
     }
-    return value
-}
+    
+    function component<T extends NumberArray>(value: Value<T>, index: number) {
+        return vector(value)[index]
+    }
+    
+    function vector<T extends NumberArray>(value: Value<T>) {
+        return notNull(value.get())
+    }
+    
+    function dereference<T extends NumberArray>(value: Value<T>, ref: number) {
+        return value.type.view(mem.stack.buffer, ref)[0]
+    }
+    
+    function notNull<T>(value: T | null | undefined, message: string = "Cannot possibly be null"): T {
+        if (!value) {
+            throw new Error(message)
+        }
+        return value
+    }
+    
+})

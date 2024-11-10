@@ -3,6 +3,10 @@ export type WebAssemblyModules<N extends string> = Record<N, WebAssembly.Module>
 export type WebAssemblyInstance = Pick<WebAssembly.Instance, any>
 export type WebAssemblyInstances<N extends string> = Record<N, WebAssemblyInstance>
 
+export type ModulesLoader = <N extends string>(waPath: string, modulePaths: WebAssemblyModulePaths<N>) => Promise<WebAssemblyModules<N>>
+
+export const webModulesLoader: ModulesLoader = webLoadModules
+
 export async function webLoadModules<N extends string>(waPath: string, modulePaths: WebAssemblyModulePaths<N>): Promise<WebAssemblyModules<N>> {
     const result: WebAssemblyModules<string> = {}
     for (const moduleName in modulePaths) {

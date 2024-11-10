@@ -1,14 +1,15 @@
 import { expect } from 'chai'
-import * as rt from '../prod/rt-node.js'
+import * as rt from '../prod/rt.js'
+import * as waNode from '../prod/wa-node.js'
 import * as dt from '../prod/datatypes.js'
 
-const runtime = rt.fsRuntime("./out/wa")
-const mem = notNull(runtime.exports.mem, "Couldn't load Vibrato runtime 'mem' module !")
-const space = notNull(runtime.exports.space, "Couldn't load Vibrato runtime 'space' module!")
-const delay = notNull(runtime.exports.delay, "Couldn't load Vibrato runtime 'delay' module!")
+describe("Runtime", async () => {
 
-describe("Runtime", () => {
-
+    const runtime = await rt.runtime("./out/wa", waNode.fsModulesLoader)
+    const mem = notNull(runtime.exports.mem, "Couldn't load Vibrato runtime 'mem' module !")
+    const space = notNull(runtime.exports.space, "Couldn't load Vibrato runtime 'space' module!")
+    const delay = notNull(runtime.exports.delay, "Couldn't load Vibrato runtime 'delay' module!")
+    
     let location = 0
     
     beforeEach(() => {
@@ -552,46 +553,44 @@ describe("Runtime", () => {
 
     })
 
+    function length(v: Float64Array): number {
+        return Math.sqrt(dot(v, v))
+    }
+    
+    function dot(v1: Float64Array, v2: Float64Array): number {
+        return v1.reduce((p, c1, i) => p + c1 * v2[i], 0)
+    }
+    
+    function randomVector(vectorType: dt.Vector<Float64Array>, filter: (n: number) => boolean = () => true): [rt.Reference, Float64Array] {
+        const ref = mem.allocate64(vectorType.size)
+        const vector = vectorType.flatView(mem.stack.buffer, ref, 1)
+        randomize(vector, filter)
+        return [ref, vector]
+    }
+    
+    function randomize(a: Float64Array, filter: (n: number) => boolean = () => true) {
+        for (let i = 0; i < a.length; i++) {
+            a[i] = randomNumber(filter)
+        }
+    }
+    
+    function randomNumber(filter: (n: number) => boolean = () => true) {
+        let n = Math.random()
+        while (!filter(n)) {
+            n = Math.random()
+        }
+        return n
+    }
+    
+    function randomInt(min: number = 0, max: number = min + 100): number {
+        return Math.round((max - min) * Math.random() + min)
+    }
+    
+    function notNull<T>(value: T | undefined, message: string): T {
+        if (!value) {
+            throw new Error(message)
+        }
+        return value
+    }
+
 })
-
-type Op = (v1: rt.Reference, v2: rt.Reference) => rt.Reference
-
-function length(v: Float64Array): number {
-    return Math.sqrt(dot(v, v))
-}
-
-function dot(v1: Float64Array, v2: Float64Array): number {
-    return v1.reduce((p, c1, i) => p + c1 * v2[i], 0)
-}
-
-function randomVector(vectorType: dt.Vector<Float64Array>, filter: (n: number) => boolean = () => true): [rt.Reference, Float64Array] {
-    const ref = mem.allocate64(vectorType.size)
-    const vector = vectorType.flatView(mem.stack.buffer, ref, 1)
-    randomize(vector, filter)
-    return [ref, vector]
-}
-
-function randomize(a: Float64Array, filter: (n: number) => boolean = () => true) {
-    for (let i = 0; i < a.length; i++) {
-        a[i] = randomNumber(filter)
-    }
-}
-
-function randomNumber(filter: (n: number) => boolean = () => true) {
-    let n = Math.random()
-    while (!filter(n)) {
-        n = Math.random()
-    }
-    return n
-}
-
-function randomInt(min: number = 0, max: number = min + 100): number {
-    return Math.round((max - min) * Math.random() + min)
-}
-
-function notNull<T>(value: T | undefined, message: string): T {
-    if (!value) {
-        throw new Error(message)
-    }
-    return value
-}

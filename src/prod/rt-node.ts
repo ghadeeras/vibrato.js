@@ -124,12 +124,3 @@ export function addDelayImportsToModule(module: binaryen.Module) {
     module.addFunctionImport("item_ref", "delay", "item_ref", binaryen.createType([binaryen.i32, binaryen.i32]), binaryen.i32)
     module.addFunctionImport("rotate", "delay", "rotate", binaryen.createType([binaryen.i32]), binaryen.i32)
 }
-
-export function fsRuntime(waPath: string): rt.Runtime {
-    const modules = fsLoadRuntimeModules(waPath);
-    return rt.linkRuntime(modules)
-}
-
-export function fsLoadRuntimeModules(waPath: string): waNode.WebAssemblyModules<rt.RuntimeModuleNames> {
-    return waNode.fsLoadModules(waPath, rt.runtimeModulePaths())
-}

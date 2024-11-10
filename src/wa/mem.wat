@@ -1,6 +1,6 @@
 (module
 
-    (memory $stack 1 0x10000)
+    (import "rawMem" "mem" (memory $stack 1))
 
     (global $stackTop (mut i32) (i32.const 0))
     (global $localOffset (mut i32) (i32.const 0))
@@ -174,6 +174,12 @@
     ;;     )
     ;;     (local.get $result)
     ;; )
+
+    (func $init
+        (drop (call $allocate8 (i32.load (i32.const 0))))
+    )
+    
+    (start $init)
 
     (export "stack" (memory $stack))
 

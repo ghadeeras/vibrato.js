@@ -1,7 +1,8 @@
 import { expect } from 'chai'
 import { Literal } from '../../prod/values/literal.js'
 import { Assembler } from '../../prod/assembler.js'
-import { fsRuntime } from '../../prod/rt-node.js'
+import * as rt from '../../prod/rt.js'
+import * as waNode from '../../prod/wa-node.js'
 import * as types from '../../prod/datatypes.js'
 
 type TestExports = {
@@ -18,12 +19,12 @@ const assembler = new Assembler([
     Literal.vector(1.2, 2.3, 3.4).named("vector")        
 ])
 
-const runtime = fsRuntime("./out/wa")
-const mem = notNull(runtime.exports.mem, "Couldn't load Vibrato runtime!")
-const test = assembler.exports<TestExports>(runtime)
+describe("Literal", async () => {
 
-describe("Literal", () => {
-
+    const runtime = await rt.runtime("./out/wa", waNode.fsModulesLoader, assembler.rawMem)
+    const mem = notNull(runtime.exports.mem, "Couldn't load Vibrato runtime!")
+    const test = assembler.exports<TestExports>(runtime)
+    
     it("returns literal scalar values", () => {
         expect(test.pi()).to.equal(3.14)
     })

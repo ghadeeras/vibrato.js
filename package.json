@@ -37,6 +37,6 @@
     "seedrandom": "3.0.5"
   },
   "dependencies": {
-    "binaryen": "^109.0.0"
+    "binaryen": "^120.0.0"
   }
 }

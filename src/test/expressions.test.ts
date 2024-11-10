@@ -1,7 +1,8 @@
 import { expect } from 'chai'
 import { Literal } from '../prod/values/literal.js'
 import { Assembler } from '../prod/assembler.js'
-import * as rt from '../prod/rt-node.js'
+import * as rt from '../prod/rt.js'
+import * as waNode from '../prod/wa-node.js'
 import * as dt from '../prod/datatypes.js'
 import * as exps from '../prod/expressions.js'
 import * as ops from '../prod/values/operations.js'
@@ -59,12 +60,12 @@ const assembler = new Assembler([
     vectorDelay.at(minus8).named("vectorDelay_8")
 ])
 
-const runtime = rt.fsRuntime("./out/wa")
-const mem = notNull(runtime.exports.mem, "Couldn't load Vibrato runtime!")
-const test = assembler.exports<TestExports>(runtime)
+describe("expressions", async () => {
 
-describe("expressions", () => {
-
+    const runtime = await rt.runtime("./out/wa", waNode.fsModulesLoader, assembler.rawMem)
+    const mem = notNull(runtime.exports.mem, "Couldn't load Vibrato runtime!")
+    const test = assembler.exports<TestExports>(runtime)
+    
     describe("delay", () => {
 
         it("checks for type mismatch", () => {
@@ -118,6 +119,31 @@ describe("expressions", () => {
 
     })
 
+    function dereference<T extends dt.NumberArray>(type: dt.Vector<T>, ref: number) {
+        return [...type.view(mem.stack.buffer, ref)[0]]
+    }
+    
+    function notNull<T>(value: T | undefined, message: string): T {
+        if (!value) {
+            throw new Error(message)
+        }
+        return value
+    }
+    
+    function printDelays() {
+        // printDelay("discreteUnitDelay", discreteUnitDelay)
+        // printDelay("scalarUnitDelay", scalarUnitDelay)
+        // printDelay("vectorUnitDelay", vectorUnitDelay)
+        // printDelay("discreteDelay", discreteDelay)
+        // printDelay("scalarDelay", scalarDelay)
+        // printDelay("vectorDelay", vectorDelay)
+        // console.log("")
+    }
+    
+    function printDelay<A extends dt.NumberArray>(name: string, delay: exps.Delay<A>) {
+        console.log(name + " = " + delay.type.flatView(mem.stack.buffer, delay.delayBufferReference, delay.length))
+    }
+    
 })
 
 utils.specificationsOf("Apply Operation", () => {
@@ -155,37 +181,10 @@ utils.specificationsOf("Variable", () => {
 
     utils.specificationsOf("vector", () => {
 
-            const v = exps.Variable.spreadVectorOf(3, dt.real)
-            const expectedResult = [3, 5, 7]
-    
-            utils.expectation("Uses parameters as components", v, [3, 5, 7], utils.deeplyEquals([3, 5, 7]))
+        const v = exps.Variable.spreadVectorOf(3, dt.real)
+
+        utils.expectation("Uses parameters as components", v, [3, 5, 7], utils.deeplyEquals([3, 5, 7]))
 
     })
 
 })
-
-function dereference<T extends dt.NumberArray>(type: dt.Vector<T>, ref: number) {
-    return [...type.view(mem.stack.buffer, ref)[0]]
-}
-
-function notNull<T>(value: T | undefined, message: string): T {
-    if (!value) {
-        throw new Error(message)
-    }
-    return value
-}
-
-function printDelays() {
-    // printDelay("discreteUnitDelay", discreteUnitDelay)
-    // printDelay("scalarUnitDelay", scalarUnitDelay)
-    // printDelay("vectorUnitDelay", vectorUnitDelay)
-    // printDelay("discreteDelay", discreteDelay)
-    // printDelay("scalarDelay", scalarDelay)
-    // printDelay("vectorDelay", vectorDelay)
-    // console.log("")
-}
-
-function printDelay<A extends dt.NumberArray>(name: string, delay: exps.Delay<A>) {
-    console.log(name + " = " + delay.type.flatView(mem.stack.buffer, delay.delayBufferReference, delay.length))
-}
-

@@ -7,63 +7,65 @@ import binaryen from 'binaryen'
 
 export class Assembler {
 
+    readonly rawMemTextCode: string;
+    readonly rawMemBinaryCode: Uint8Array
+
     readonly nonOptimizedTextCode: string;
     readonly nonOptimizedBinaryCode: Uint8Array;
+
     readonly textCode: string;
     readonly binaryCode: Uint8Array
-    
+
     constructor(expressions: exps.Expression[]) {
-        const allExpressions: exps.Expression[] = flatten(expressions)
-        const module = this.newModule();
+        const allExpressions = flatten(expressions)
+        const rawMemModule = this.newModule(false)
+        const module = this.newModule(true)
         try {
-            const stackOffset = this.organizeMemory(module, allExpressions);
-            this.declareStartFunction(module, stackOffset);
+            this.organizeMemory(rawMemModule, allExpressions)
+            
+            this.validate(rawMemModule)
+            rawMemModule.optimize()
+            this.rawMemTextCode = rawMemModule.emitText()
+            this.rawMemBinaryCode =  rawMemModule.emitBinary()
+
             this.declareCycleFunction(module, allExpressions);
             this.declareExpressionFunctions(module, allExpressions);
     
-            this.validate(module);
+            this.validate(module)
             this.nonOptimizedTextCode = module.emitText()
-            this.nonOptimizedBinaryCode = module.emitBinary();
+            this.nonOptimizedBinaryCode = module.emitBinary()
     
-            module.optimize();
-            this.textCode = module.emitText();
-            this.binaryCode = module.emitBinary();
+            module.optimize()
+            this.textCode = module.emitText()
+            this.binaryCode = module.emitBinary()
             
+            console.log(`Raw memory code: \n${this.rawMemTextCode}`)
             console.log(`Final code: \n${this.textCode}`)
         } catch (e) {
             console.log(e)
             console.log(`Bad code: \n${module.emitText()}`)
             throw e
         } finally {
-            module.dispose();
+            rawMemModule.dispose()
+            module.dispose()
         }
     }
 
-    private newModule() {
+    private newModule(withRT: boolean) {
         const module = new binaryen.Module();
         module.setFeatures(module.getFeatures() | binaryen.Features.BulkMemory);
-        rt.addImportsToModule(module)
+        if (withRT) {
+            rt.addImportsToModule(module)
+        }
         return module;
     }
 
     private organizeMemory(module: binaryen.Module, expressions: exps.Expression[]) {
-        const memoryAllocator = new StaticMemoryAllocatorImpl(module);
-
+        const memoryBuilder = new StaticMemoryBuilder(module);
         for (let value of expressions) {
-            value.memory(memoryAllocator);
+            value.memory(memoryBuilder);
         }
-        memoryAllocator.allocate(8, charCodesOf("STACK..."));
-
-        const stackOffset = memoryAllocator.stackOffset;
-        const minPages = (stackOffset + 0xFFFF) / 0x10000;
-        module.setMemory(minPages, 65536, "stack", memoryAllocator.memorySegments);
-        return stackOffset;
-    }
-
-    private declareStartFunction(module: binaryen.Module, stackOffset: number) {
-        module.setStart(module.addFunction("init", binaryen.createType([]), binaryen.none, [],
-            module.drop(module.call("allocate8", [module.i32.const(stackOffset)], binaryen.i32))
-        ));
+        memoryBuilder.build();
     }
 
     private declareCycleFunction(module: binaryen.Module, expressions: exps.Expression[]) {
@@ -102,6 +104,10 @@ export class Assembler {
         }
     }
 
+    get rawMem() {
+        return this.rawMemBinaryCode.buffer
+    }
+
     exports<E extends WebAssembly.Exports>(rt: rt.Runtime): E {
         const linker = new wa.Linker({
             generated: new WebAssembly.Module(this.binaryCode.buffer)
@@ -111,12 +117,13 @@ export class Assembler {
 
 }
 
-class StaticMemoryAllocatorImpl implements exps.StaticMemoryAllocator {
+class StaticMemoryBuilder implements exps.StaticMemoryAllocator {
 
     private offset: number = 0
-    readonly segments: binaryen.MemorySegment[] = []
+    private segments: binaryen.MemorySegment[] = []
 
-    constructor(readonly module: binaryen.Module) {
+    constructor(private module: binaryen.Module) {
+        this.allocate(4, [0, 0, 0, 0])
     }
     
     declare<A extends types.NumberArray>(vector: types.Vector<A>, initialValue: number[]): number {
@@ -126,7 +133,14 @@ class StaticMemoryAllocatorImpl implements exps.StaticMemoryAllocator {
         );
     }
 
-    allocate<A extends types.NumberArray>(wordSize: types.PrimitiveSize<A>, array: ArrayBufferLike | ArrayLike<number>) {
+    build() {
+        this.allocate(8, charCodesOf("STACK..."));
+        const minPages = (this.offset + 0xFFFF) / 0x10000;
+        new Uint32Array(this.segments[0].data.buffer)[0] = this.offset
+        this.module.setMemory(minPages, 65536, "mem", this.segments);
+    }
+    
+    private allocate<A extends types.NumberArray>(wordSize: types.PrimitiveSize<A>, array: ArrayBufferLike | ArrayLike<number>) {
         const alignment = (wordSize - this.offset % wordSize) % wordSize;
         const result = this.offset + alignment;
 
@@ -141,14 +155,6 @@ class StaticMemoryAllocatorImpl implements exps.StaticMemoryAllocator {
         return result;
     }
 
-    get stackOffset() {
-        return this.offset
-    }
-
-    get memorySegments() {
-        return this.segments
-    }
-    
 }
 
 function charCodesOf(stackMarker: string) {

@@ -2,6 +2,12 @@ import * as wa from "./wa.js"
 
 export type Reference = number;
 
+export type RawMemExports = {
+    
+    mem: WebAssembly.Memory;
+
+}
+
 export type MemExports = {
     
     stack: WebAssembly.Memory;
@@ -117,6 +123,7 @@ export type DelayExports = {
 }
 
 export type RuntimeExports = {
+    rawMem: RawMemExports,
     mem: MemExports
     space: SpaceExports
     delay: DelayExports
@@ -132,19 +139,23 @@ export type Runtime = {
 
 export function runtimeModulePaths(): Record<RuntimeModuleNames, string> {
     return {
+        rawMem: "rawMem.wasm",
         mem: "mem.wasm",
         space: "space.wasm",
         delay: "delay.wasm",
     }
 } 
 
-export async function webRuntime(waPath: string): Promise<Runtime> {
-    const modules = await webLoadRuntimeModules(waPath);
+export async function runtime(waPath: string, modulesLoader: wa.ModulesLoader = wa.webModulesLoader, rawMem: ArrayBuffer | null = null): Promise<Runtime> {
+    const modules = await loadRuntimeModules(waPath, modulesLoader);
+    if (rawMem) {
+        modules.rawMem = new WebAssembly.Module(rawMem)
+    }
     return linkRuntime(modules);
 }
 
-export async function webLoadRuntimeModules(waPath: string): Promise<wa.WebAssemblyModules<RuntimeModuleNames>> {
-    return await wa.webLoadModules(waPath, runtimeModulePaths());
+export async function loadRuntimeModules(waPath: string, modulesLoader: wa.ModulesLoader = wa.webModulesLoader): Promise<wa.WebAssemblyModules<RuntimeModuleNames>> {
+    return await modulesLoader(waPath, runtimeModulePaths());
 }
 
 export function linkRuntime(modules: wa.WebAssemblyModules<RuntimeModuleNames>): Runtime {
@@ -154,6 +165,7 @@ export function linkRuntime(modules: wa.WebAssemblyModules<RuntimeModuleNames>):
         modules: modules,
         instances: instances,
         exports: {
+            rawMem: instances.rawMem.exports,
             mem: instances.mem.exports,
             space: instances.space.exports,
             delay: instances.delay.exports,
