@@ -10,10 +10,9 @@
                 "--require", "source-map-support/register",
                 "--timeout", "120000000",
                 // "--fgrep", ">>>",
-                "\"${workspaceFolder}/out/test/**/*.test.js\"",
+                "\"${workspaceFolder}/lib/test/**/*.test.js\"",
             ],
-            "console": "integratedTerminal",
-            "preLaunchTask": "tsc: build"
+            "console": "integratedTerminal"
         }
     ]
 }

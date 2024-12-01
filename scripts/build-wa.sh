@@ -1,13 +1,13 @@
 #!/usr/bin/bash
 
 echo "Making sure runtime output directory exists ..."
-mkdir -p ./out
-rm -fR ./out/wa 
-mkdir ./out/wa || exit 1 
+mkdir -p ./lib
+rm -fR ./lib/wa 
+mkdir ./lib/wa || exit 1 
 
 echo "Building runtime modules ..."
 ls ./src/wa/*.wat \
     | xargs -I {} basename {} ".wat" \
-    | xargs -I {} wat2wasm --output=./out/wa/{}.wasm ./src/wa/{}.wat || exit 1
+    | xargs -I {} wat2wasm --output=./lib/wa/{}.wasm ./src/wa/{}.wat || exit 1
 
 echo "Success!"

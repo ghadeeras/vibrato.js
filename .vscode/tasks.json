@@ -23,7 +23,7 @@
 		{
 			"label": "wasm: build",
 			"type": "shell",
-			"command": "${cwd}/build-wasm.sh",
+			"command": "node ./scripts/build-wa.js",
 			"group": "build"
 		}
 	]

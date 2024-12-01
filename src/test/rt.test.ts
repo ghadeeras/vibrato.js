@@ -5,7 +5,7 @@ import * as dt from '../prod/datatypes.js'
 
 describe("Runtime", async () => {
 
-    const runtime = await rt.runtime("./out/wa", waNode.fsModulesLoader)
+    const runtime = await rt.runtime("./lib/wa", waNode.fsModulesLoader)
     const mem = notNull(runtime.exports.mem, "Couldn't load Vibrato runtime 'mem' module !")
     const space = notNull(runtime.exports.space, "Couldn't load Vibrato runtime 'space' module!")
     const delay = notNull(runtime.exports.delay, "Couldn't load Vibrato runtime 'delay' module!")

@@ -84,7 +84,7 @@ const assembler = new Assembler([
 
 describe("Operations", async () => {
 
-    const runtime = await rt.runtime("./out/wa", waNode.fsModulesLoader, assembler.rawMem)
+    const runtime = await rt.runtime("./lib/wa", waNode.fsModulesLoader, assembler.rawMem)
     const mem = notNull(runtime.exports.mem, "Couldn't load Vibrato runtime!")
     const test = assembler.exports<TestExports>(runtime)
     
