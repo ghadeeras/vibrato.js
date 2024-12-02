@@ -2,8 +2,8 @@
   "name": "vibrato.js",
   "version": "1.0.0",
   "description": "Digital signal processing framework for the JavaScript programming language.",
-  "main": "index.js",
   "type": "module",
+  "exports": "./index.js",
   "scripts": {
     "clean": "node ./scripts/clean.js",
     "build-wa": "node ./scripts/build-wa.js",
