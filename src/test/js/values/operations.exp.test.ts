@@ -1,8 +1,8 @@
-import { Literal } from "../../prod/values/literal.js"
-import { Add } from "../../prod/values/operations.js"
+import { Literal } from "../../../prod/js/values/literal.js"
+import { Add } from "../../../prod/js/values/operations.js"
 import { expectation, specificationsOf, deeplyEquals } from "../testutils.js"
-import { real } from "../../prod/datatypes.js"
-import { Variable } from "../../prod/expressions.js"
+import { real } from "../../../prod/js/datatypes.js"
+import { Variable } from "../../../prod/js/expressions.js"
 
 specificationsOf("Operations", () => {
 

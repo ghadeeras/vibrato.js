@@ -5,9 +5,11 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "prepare": "node ./scripts/clean.js && node ./scripts/build-wa.js && npx tsc --project ./tsconfig.prepare.json && node ./scripts/finalize.js",
-    "pretest": "node ./scripts/clean.js && node ./scripts/build-wa.js && npx tsc",
-    "test": "nyc --reporter=html -- mocha --recursive \"./lib/test/**/*.test.js\""
+    "clean": "node ./scripts/clean.js",
+    "build-wa": "node ./scripts/build-wa.js",
+    "prepare": "npm run clean && npm run build-wa && npx tsc --project ./tsconfig.prepare.json && node ./scripts/finalize.js",
+    "pretest": "npm run clean && npm run build-wa && npx tsc",
+    "test": "nyc --reporter=html -- mocha --recursive \"./out/test/**/*.test.js\""
   },
   "repository": {
     "type": "git",

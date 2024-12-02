@@ -2,19 +2,17 @@ import fs from 'fs'
 import binaryen from "binaryen"
 
 const src = "./src"
+const out = "./out"
 const lib = "./lib"
-const waSrc = `${src}/wa`
-const waLib = `${lib}/wa`
-const jsLib = `${lib}/js`
-const prodLib = `${lib}/prod`
+const jsSrc = `${src}/prod/js`
+const jsOut = `${out}/prod/js`
+const waSrc = `${src}/prod/wa`
+const waOut = `${out}/prod/wa`
 
 export function compileRuntime() {
     console.log("Making sure runtime output directory exists ...")
-    if (!fs.existsSync(lib)) {
-        fs.mkdirSync(lib)
-    }
-    if (!fs.existsSync(waLib)) {
-        fs.mkdirSync(waLib)
+    if (!fs.existsSync(waOut)) {
+        fs.mkdirSync(waOut, { recursive: true })
     }
     
     console.log("Building runtime modules ...")
@@ -27,15 +25,23 @@ export function compileRuntime() {
         module.setFeatures(binaryen.Features.BulkMemory)
         module.optimize()
         const binary = module.emitBinary()
-        fs.writeFileSync(`${waLib}/${watFile.replace(".wat", ".wasm")}`, binary)
+        fs.writeFileSync(`${waOut}/${watFile.replace(".wat", ".wasm")}`, binary)
     }
-    console.log("Success!")
 }
 
 export function clean() {
-    fs.rmSync(lib, { force: true, recursive: true })
+    console.log("Cleaning working directory ...")
+    if (fs.existsSync(out)) {
+        fs.rmSync(out, { force: true, recursive: true })
+    }
+    if (fs.existsSync(lib)) {
+        fs.rmSync(lib, { force: true, recursive: true })
+    }
 }
 
 export function finalize() {
-    fs.renameSync(prodLib, jsLib)
+    console.log("Finalizing package setup ...")
+    fs.renameSync(`${out}/prod`, lib)
+    fs.rmSync(out, { recursive: true })
+    console.log("Success!")
 }
