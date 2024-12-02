@@ -1,4 +1,5 @@
 import * as rt from "./rt.js"
+import * as wa from "./wa.js"
 import * as waNode from "./wa-node.js"
 
 import binaryen from 'binaryen'
@@ -124,3 +125,9 @@ export function addDelayImportsToModule(module: binaryen.Module) {
     module.addFunctionImport("item_ref", "delay", "item_ref", binaryen.createType([binaryen.i32, binaryen.i32]), binaryen.i32)
     module.addFunctionImport("rotate", "delay", "rotate", binaryen.createType([binaryen.i32]), binaryen.i32)
 }
+
+export function runtime(modulesLoader: wa.SyncModulesLoader = waNode.syncFsModulesLoader, rawMem: ArrayBuffer | null = null): rt.Runtime {
+    const modules = modulesLoader(import.meta.dirname + "/../wa", rt.runtimeModulePaths());
+    return rt.createRuntime(rawMem, modules);
+}
+

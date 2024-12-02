@@ -4,6 +4,7 @@ export type WebAssemblyInstance = Pick<WebAssembly.Instance, any>
 export type WebAssemblyInstances<N extends string> = Record<N, WebAssemblyInstance>
 
 export type ModulesLoader = <N extends string>(waPath: string, modulePaths: WebAssemblyModulePaths<N>) => Promise<WebAssemblyModules<N>>
+export type SyncModulesLoader = <N extends string>(waPath: string, modulePaths: WebAssemblyModulePaths<N>) => WebAssemblyModules<N>
 
 export const webModulesLoader: ModulesLoader = webLoadModules
 

@@ -10,7 +10,7 @@
                 "--require", "source-map-support/register",
                 "--timeout", "120000000",
                 // "--fgrep", ">>>",
-                "\"${workspaceFolder}/lib/test/**/*.test.js\"",
+                "\"${workspaceFolder}/out/test/**/*.test.js\"",
             ],
             "console": "integratedTerminal"
         }

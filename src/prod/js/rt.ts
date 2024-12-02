@@ -146,12 +146,16 @@ export function runtimeModulePaths(): Record<RuntimeModuleNames, string> {
     }
 } 
 
-export async function runtime(waPath: string, modulesLoader: wa.ModulesLoader = wa.webModulesLoader, rawMem: ArrayBuffer | null = null): Promise<Runtime> {
-    const modules = await loadRuntimeModules(waPath, modulesLoader);
+export async function runtime(waPath: string = import.meta.url + "/../wa", modulesLoader: wa.ModulesLoader = wa.webModulesLoader, rawMem: ArrayBuffer | null = null): Promise<Runtime> {
+    const modules = await loadRuntimeModules(waPath, modulesLoader)
+    return createRuntime(rawMem, modules)
+}
+
+export function createRuntime(rawMem: ArrayBuffer | null, modules: wa.WebAssemblyModules<keyof RuntimeExports>) {
     if (rawMem) {
         modules.rawMem = new WebAssembly.Module(rawMem)
     }
-    return linkRuntime(modules);
+    return linkRuntime(modules)
 }
 
 export async function loadRuntimeModules(waPath: string, modulesLoader: wa.ModulesLoader = wa.webModulesLoader): Promise<wa.WebAssemblyModules<RuntimeModuleNames>> {
