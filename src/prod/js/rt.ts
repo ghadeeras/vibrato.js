@@ -146,7 +146,7 @@ export function runtimeModulePaths(): Record<RuntimeModuleNames, string> {
     }
 } 
 
-export async function runtime(waPath: string = import.meta.url + "/../wa", modulesLoader: wa.ModulesLoader = wa.webModulesLoader, rawMem: ArrayBuffer | null = null): Promise<Runtime> {
+export async function runtime(waPath: string = import.meta.url + "/../../wa", modulesLoader: wa.ModulesLoader = wa.webModulesLoader, rawMem: ArrayBuffer | null = null): Promise<Runtime> {
     const modules = await loadRuntimeModules(waPath, modulesLoader)
     return createRuntime(rawMem, modules)
 }

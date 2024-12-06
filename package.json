@@ -1,9 +1,13 @@
 {
   "name": "vibrato.js",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Digital signal processing framework for the JavaScript programming language.",
   "type": "module",
-  "exports": "./index.js",
+  "exports": {
+    ".": "./lib/js/index.js",
+    "./core": "./lib/js/core.js",
+    "./core.node": "./lib/js/core.node.js"
+  },
   "scripts": {
     "clean": "node ./scripts/clean.js",
     "build-wa": "node ./scripts/build-wa.js",
@@ -30,10 +34,7 @@
   },
   "homepage": "https://github.com/ghadeeras/vibrato.js#readme",
   "files": [
-    "lib",
-    "index.js",
-    "index.d.ts",
-    "docs"
+    "lib"
   ],
   "devDependencies": {
     "@types/chai": "^5.0.1",

@@ -4,3 +4,4 @@ node_modules
 lib
 out
 tsconfig.tsbuildinfo
+vibrato.js-*.tgz
