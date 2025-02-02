@@ -36,22 +36,3 @@ jobs:
       run: |
         npm ci --ignore-scripts
         npm test
-
-    - name: Prepare for Releasing to 'dist'
-      run: |
-        npm run prepare
-        cp -R docs ./lib
-        cp README.md ./lib
-        cp scripts/release.sh .
-
-    - name: Switch to 'dist' branch
-      uses: actions/checkout@v2
-      with:
-        ref: dist
-        clean: false
-
-    - name: Push the transpiling-output code to dist branch
-      run: |
-          git config user.name github-actions
-          git config user.email github-actions@github.com
-          bash ./release.sh
