@@ -1,5 +1,5 @@
 import * as types from './datatypes.js'
-import * as rt from './rt.js'
+import { rt } from 'aether'
 
 import binaryen from 'binaryen'
 

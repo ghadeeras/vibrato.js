@@ -10,9 +10,8 @@
   },
   "scripts": {
     "clean": "node ./scripts/clean.js",
-    "build-wa": "node ./scripts/build-wa.js",
-    "prepare": "npm run clean && npm run build-wa && npx tsc --project ./tsconfig.prepare.json && node ./scripts/finalize.js",
-    "pretest": "npm run clean && npm run build-wa && npx tsc",
+    "prepare": "npm run clean && npx tsc --project ./tsconfig.prepare.json && node ./scripts/finalize.js",
+    "pretest": "npm run clean && npx tsc",
     "test": "nyc --reporter=html -- mocha --recursive \"./out/test/**/*.test.js\""
   },
   "repository": {
@@ -48,6 +47,7 @@
     "typescript": "^5.7.2"
   },
   "dependencies": {
+    "aether": "git+https://github.com/ghadeeras/aether.git",
     "binaryen": "^120.0.0"
   }
 }

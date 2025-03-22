@@ -1,8 +1,7 @@
 import { expect } from 'chai'
 import { Literal } from '../../../prod/js/values/literal.js'
 import { Assembler } from '../../../prod/js/assembler.js'
-import * as rt from '../../../prod/js/rt.js'
-import * as waNode from '../../../prod/js/wa-node.js'
+import * as rt from '../../../prod/js/rt-node.js'
 import * as types from '../../../prod/js/datatypes.js'
 
 type TestExports = {
@@ -21,7 +20,7 @@ const assembler = new Assembler([
 
 describe("Literal", async () => {
 
-    const runtime = await rt.runtime("./out/prod/wa", waNode.fsModulesLoader, assembler.rawMem)
+    const runtime = rt.runtime(assembler.rawMem)
     const mem = notNull(runtime.exports.mem, "Couldn't load Vibrato runtime!")
     const test = assembler.exports<TestExports>(runtime)
     
